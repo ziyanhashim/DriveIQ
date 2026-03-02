@@ -39,6 +39,8 @@ from app.ml.predictor import predict_from_dataframe
 from app.permissions import get_current_user, require_role
 from app.utils import to_jsonable
 
+from routers.session_router import router as session_router
+app.include_router(session_router, prefix="/api/sessions", tags=["Sessions"])
 
 # ═══════════════════════════════════════════════════════════════════════════
 # HELPERS
