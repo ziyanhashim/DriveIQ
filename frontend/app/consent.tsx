@@ -30,7 +30,7 @@ export default function ConsentScreen() {
       return;
     }
 
-    router.replace("/(tabs)/dashboard");
+    router.replace("/(instructortabs)/dashboard");
   };
 
   return (

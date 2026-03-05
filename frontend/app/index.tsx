@@ -37,13 +37,16 @@ export default function LoginScreen() {
 
       await setToken(res.access_token);
       if (res.user?.name) {
-      await AsyncStorage.setItem("driveiq_user_name", res.user.name);
+        await AsyncStorage.setItem("driveiq_user_name", res.user.name);
+      }
+      if (res.user?.role) {
+        await AsyncStorage.setItem("driveiq_user_role", res.user.role);
       }
 
       const backendRole = res.user?.role;
 
       if (backendRole === "instructor") {
-        router.replace("/(tabs)/dashboard");
+        router.replace("/(instructortabs)/dashboard");
       } else {
         router.replace("/(studenttabs)/dashboard");
       }

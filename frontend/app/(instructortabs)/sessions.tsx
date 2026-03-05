@@ -16,13 +16,15 @@ import { apiGet, apiPost } from "../../lib/api";
 import { Picker } from "@react-native-picker/picker";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 
-type SessionStatus = "scheduled" | "active" | "completed" | "cancelled";
+type SessionStatus = "scheduled" | "active" | "completed" | "cancelled" | "confirmed";
 
 type SessionDoc = {
-  session_id: string;
+  session_id: string | null;
+  booking_id?: string;
   trainee_id: string;
+  trainee_name?: string;
   instructor_id: string;
-  vehicle_id: string;
+  vehicle_id: string | null;
   scheduled_at: string;
   duration_min: number;
   status: SessionStatus;
@@ -93,6 +95,8 @@ function setTimePart(base: Date, time: Date) {
 
 function pillFor(status: SessionStatus) {
   switch (status) {
+    case "confirmed":
+      return { bg: "#2563EB", text: "#fff", label: "Booked" };
     case "active":
       return { bg: "#16A34A", text: "#fff", label: "Active" };
     case "completed":
@@ -134,6 +138,10 @@ export default function SessionsScreen() {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
+      // Reset in-flight guards so the next mount triggers a fresh load
+      loadSessionsInFlight.current = false;
+      loadLearnersInFlight.current = false;
+      openReportInFlight.current = false;
     };
   }, []);
 
@@ -166,8 +174,9 @@ export default function SessionsScreen() {
   const [selectedReport, setSelectedReport] = useState<ReportResponse | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
 
-  // ending state
+  // ending / generating state
   const [endingId, setEndingId] = useState<string | null>(null);
+  const [generatingId, setGeneratingId] = useState<string | null>(null);
 
   // debug / UX
   const [lastAction, setLastAction] = useState<string>("");
@@ -387,6 +396,39 @@ export default function SessionsScreen() {
     ]);
   };
 
+  const generateReport = (sessionId: string) => {
+    Alert.alert(
+      "Generate ML Report",
+      "This runs the full ML pipeline (~10–30 seconds). Continue?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Generate",
+          onPress: async () => {
+            try {
+              if (!isMountedRef.current) return;
+              setGeneratingId(sessionId);
+              setLastAction(`Generating report for ${sessionId}…`);
+              await apiPost(`/sessions/${sessionId}/generate-feedback`, {});
+              if (!isMountedRef.current) return;
+              setLastAction("Report generated ✅ (loading analysis)");
+              await loadSessions();
+              await openReport(sessionId);
+            } catch (e: any) {
+              if (!isMountedRef.current) return;
+              const msg = friendlyError(e);
+              setLastAction(`Generate failed ❌ ${msg}`);
+              Alert.alert("Generate Report", msg);
+            } finally {
+              if (!isMountedRef.current) return;
+              setGeneratingId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
 
@@ -401,7 +443,8 @@ export default function SessionsScreen() {
       const match =
         !q ||
         name.toLowerCase().includes(q) ||
-        s.session_id.toLowerCase().includes(q) ||
+        (s.session_id || "").toLowerCase().includes(q) ||
+        (s.booking_id || "").toLowerCase().includes(q) ||
         (s.vehicle_id || "").toLowerCase().includes(q);
 
       return match;
@@ -442,7 +485,7 @@ export default function SessionsScreen() {
             <View style={styles.liveRow}>
               <Text style={styles.liveLabel}>Active session:</Text>
               <Text style={styles.liveId} numberOfLines={1}>
-                {activeSession.session_id}
+                {activeSession.session_id || activeSession.booking_id}
               </Text>
             </View>
 
@@ -450,8 +493,8 @@ export default function SessionsScreen() {
             <Text style={styles.mutedSmall}>Timer starts only after you press “Start”.</Text>
 
             <Pressable
-              disabled={!!endingId}
-              onPress={() => endSession(activeSession.session_id)}
+              disabled={!!endingId || !activeSession.session_id}
+              onPress={() => activeSession.session_id && endSession(activeSession.session_id)}
               style={({ pressed }) => [
                 styles.endBtn,
                 !!endingId ? { opacity: 0.6 } : null,
@@ -476,8 +519,8 @@ export default function SessionsScreen() {
           </View>
         ) : learners.length === 0 ? (
           <View style={{ marginTop: 10 }}>
-            <Text style={styles.warnTitle}>No linked trainees</Text>
-            <Text style={styles.muted}>Trainee must join using your join code first.</Text>
+            <Text style={styles.warnTitle}>No linked trainees yet</Text>
+            <Text style={styles.muted}>Trainees are linked when they book a session with you. Once booked, they will appear here.</Text>
           </View>
         ) : (
           <View style={{ marginTop: 12, gap: 10 }}>
@@ -597,24 +640,32 @@ export default function SessionsScreen() {
         </View>
       ) : filtered.length === 0 ? (
         <View style={styles.empty}>
-          <Text style={styles.emptyTitle}>No sessions</Text>
-          <Text style={styles.emptySub}>Create one above, then refresh.</Text>
+          <Text style={styles.emptyTitle}>No {tab === "upcoming" ? "upcoming" : "past"} sessions</Text>
+          <Text style={styles.emptySub}>
+            {tab === "upcoming"
+              ? "Bookings from students will appear here. Switch to Past to see completed sessions."
+              : "Completed sessions will appear here once students finish their sessions."}
+          </Text>
         </View>
       ) : (
         <View style={{ marginTop: 6 }}>
           {filtered.map((s) => {
             const learner = learnerMap.get(s.trainee_id);
-            const name = learner ? labelLearner(learner) : s.trainee_id;
+            const name = learner ? labelLearner(learner) : (s.trainee_name || s.trainee_id);
             const p = pillFor(s.status);
             const schedMs = safeParseMs(s.scheduled_at);
+            const rowKey = s.session_id || s.booking_id || s.trainee_id;
 
             const isEndingThis = endingId === s.session_id;
+            const isGeneratingThis = generatingId === s.session_id;
+            const isConfirmed = s.status === "confirmed";
+            const canStart = (s.status === "scheduled" || s.status === "confirmed") && !endingId && !generatingId;
 
             return (
-              <View key={s.session_id} style={styles.sessionRow}>
+              <View key={rowKey} style={styles.sessionRow}>
                 <View style={styles.sessionTop}>
                   <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>{initials(learner?.name, s.trainee_id)}</Text>
+                    <Text style={styles.avatarText}>{initials(learner?.name || s.trainee_name, s.trainee_id)}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
                     <View style={styles.nameRow}>
@@ -626,55 +677,83 @@ export default function SessionsScreen() {
                       </View>
                     </View>
                     <Text style={styles.subLine} numberOfLines={1}>
-                      ID: {s.session_id}
+                      {s.session_id ? `ID: ${s.session_id}` : `Booking: ${s.booking_id}`}
                     </Text>
                   </View>
                 </View>
 
                 <View style={styles.metaRow}>
-                  <Meta icon="🚙" label="Vehicle" value={s.vehicle_id || "—"} />
+                  {isConfirmed ? (
+                    <Meta icon="📋" label="Booking" value={s.booking_id || "—"} />
+                  ) : (
+                    <Meta icon="🚙" label="Vehicle" value={s.vehicle_id || "—"} />
+                  )}
                   <Meta icon="📅" label="Date" value={formatDate(schedMs)} />
                   <Meta icon="🕒" label="Time" value={formatTime(schedMs)} />
                 </View>
 
                 <View style={styles.actionsRow}>
                   <Pressable
-                    disabled={s.status !== "scheduled" || !!endingId}
-                    onPress={() => startSession(s.session_id)}
+                    disabled={!canStart}
+                    onPress={() => {
+                      if (isConfirmed && s.booking_id) startSession(s.booking_id);
+                      else if (s.session_id) startSession(s.session_id);
+                    }}
                     style={({ pressed }) => [
                       styles.actionBtn,
-                      s.status !== "scheduled" || !!endingId ? styles.actionBtnDisabled : null,
+                      !canStart ? styles.actionBtnDisabled : null,
                       pressed ? { opacity: 0.9 } : null,
                     ]}
                   >
                     <Text style={styles.actionBtnText}>Start</Text>
                   </Pressable>
 
-                  <Pressable
-                    disabled={s.status !== "active" || !!endingId}
-                    onPress={() => endSession(s.session_id)}
-                    style={({ pressed }) => [
-                      styles.actionBtnEnd,
-                      s.status !== "active" || !!endingId ? styles.actionBtnDisabled : null,
-                      pressed ? { opacity: 0.9 } : null,
-                    ]}
-                  >
-                    <Text style={styles.actionBtnText}>{isEndingThis ? "Ending…" : "End"}</Text>
-                  </Pressable>
+                  {!isConfirmed && (
+                    <Pressable
+                      disabled={s.status !== "active" || !!endingId}
+                      onPress={() => s.session_id && endSession(s.session_id)}
+                      style={({ pressed }) => [
+                        styles.actionBtnEnd,
+                        s.status !== "active" || !!endingId ? styles.actionBtnDisabled : null,
+                        pressed ? { opacity: 0.9 } : null,
+                      ]}
+                    >
+                      <Text style={styles.actionBtnText}>{isEndingThis ? "Ending…" : "End"}</Text>
+                    </Pressable>
+                  )}
 
-                  <Pressable
-                    onPress={() => openReport(s.session_id)}
-                    disabled={!!endingId}
-                    style={({ pressed }) => [
-                      styles.actionBtnOutline,
-                      !!endingId ? styles.actionBtnDisabled : null,
-                      pressed ? { opacity: 0.9 } : null,
-                    ]}
-                  >
-                    <Text style={styles.actionBtnOutlineText}>
-                      {reportLoading ? "Loading…" : "View analysis"}
-                    </Text>
-                  </Pressable>
+                  {!isConfirmed && s.session_id && (
+                    <Pressable
+                      onPress={() => openReport(s.session_id!)}
+                      disabled={!!endingId || !!generatingId}
+                      style={({ pressed }) => [
+                        styles.actionBtnOutline,
+                        (!!endingId || !!generatingId) ? styles.actionBtnDisabled : null,
+                        pressed ? { opacity: 0.9 } : null,
+                      ]}
+                    >
+                      <Text style={styles.actionBtnOutlineText}>
+                        {reportLoading ? "Loading…" : "View analysis"}
+                      </Text>
+                    </Pressable>
+                  )}
+
+                  {s.status === "completed" && s.session_id && (
+                    <Pressable
+                      disabled={!!generatingId || !!endingId}
+                      onPress={() => generateReport(s.session_id!)}
+                      style={({ pressed }) => [
+                        styles.actionBtnGenerate,
+                        (!!generatingId || !!endingId) ? styles.actionBtnDisabled : null,
+                        isGeneratingThis ? { opacity: 0.6 } : null,
+                        pressed ? { opacity: 0.9 } : null,
+                      ]}
+                    >
+                      <Text style={styles.actionBtnText}>
+                        {isGeneratingThis ? "Generating…" : "Generate Report"}
+                      </Text>
+                    </Pressable>
+                  )}
                 </View>
               </View>
             );
@@ -918,6 +997,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#D0D5DD",
     backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  actionBtnGenerate: {
+    minHeight: 44,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: "#7C3AED",
     alignItems: "center",
     justifyContent: "center",
   },

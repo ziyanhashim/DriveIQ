@@ -1,58 +1,51 @@
 import React, { useState, useEffect } from "react";
 import {
-  View, Text, Pressable, StyleSheet, SafeAreaView, Modal,
+  View, Text, Pressable, StyleSheet, SafeAreaView, Modal, useWindowDimensions,
 } from "react-native";
-import { router, usePathname, useGlobalSearchParams } from "expo-router";
-import { Slot } from "expo-router";
+import { router, usePathname, Slot } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { clearToken } from "../../lib/token";
 import { colors, type_, radius, space, shadow } from "../../lib/theme";
+import InstructorSidebar from "../../components/InstructorSidebar";
 
 const TABS = [
   { name: "dashboard", label: "Dashboard", icon: "⊞" },
   { name: "sessions",  label: "Sessions",  icon: "◷" },
-  { name: "reports",   label: "Reports",   icon: "▤" },
-  { name: "profile",   label: "Profile",   icon: "○" },
+  { name: "records",   label: "Records",   icon: "▤" },
   { name: "settings",  label: "Settings",  icon: "⚙" },
 ] as const;
 
 type TabName = typeof TABS[number]["name"];
 const NAV_HEIGHT = 56;
 
-export default function StudentTabsLayout() {
+export default function InstructorTabsLayout() {
   const pathname = usePathname();
+  const { width } = useWindowDimensions();
+  const isPhone = width < 900;
+
   const [menuOpen, setMenuOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
-  const [userName, setUserName] = useState("Student");
-  const [avatarLetter, setAvatarLetter] = useState("S");
+  const [userName, setUserName] = useState("Instructor");
+  const [avatarLetter, setAvatarLetter] = useState("I");
 
   useEffect(() => {
     AsyncStorage.multiGet(["driveiq_user_name", "driveiq_user_role"]).then(([[, name], [, role]]) => {
       if (name) { setUserName(name); setAvatarLetter(name.charAt(0).toUpperCase()); }
-      if (role === "instructor") {
-        router.replace("/(instructortabs)/dashboard" as any);
+      if (role === "trainee") {
+        router.replace("/(studenttabs)/dashboard" as any);
       } else if (!role) {
-        // No role stored — not logged in, go to login
         router.replace("/");
       }
     });
   }, []);
 
-  const { from } = useGlobalSearchParams<{ from?: string }>();
-
-  // Map sub-routes to their parent tab
-  const activeTab: TabName = (() => {
-    if (pathname.includes("session-report")) {
-      if (from === "reports") return "reports";
-      return "dashboard";
-    }
-    return (TABS.find((t) => pathname.includes(t.name))?.name as TabName) ?? "dashboard";
-  })();
+  const activeTab: TabName =
+    (TABS.find((t) => pathname.includes(t.name))?.name as TabName) ?? "dashboard";
 
   const navigate = (tab: TabName) => {
     setMenuOpen(false);
     setUserDropdownOpen(false);
-    router.push(`/(studenttabs)/${tab}` as any);
+    router.push(`/(instructortabs)/${tab}` as any);
   };
 
   return (
@@ -89,8 +82,6 @@ export default function StudentTabsLayout() {
           {userDropdownOpen && (
             <View style={s.userDropdown}>
               {[
-                { label: "My Account",     action: () => navigate("profile")  },
-                { label: "Profile",        action: () => navigate("profile")  },
                 { label: "Settings",       action: () => navigate("settings") },
                 { label: "Help & Support", action: () => {}                    },
                 { label: "Sign Out", action: async () => {
@@ -141,15 +132,23 @@ export default function StudentTabsLayout() {
         </Pressable>
       </Modal>
 
-      <View style={s.content}><Slot /></View>
+      {/* Body: content + optional right sidebar */}
+      <View style={s.body}>
+        <View style={s.content}><Slot /></View>
+        {!isPhone && (
+          <View style={s.sidebar}>
+            <InstructorSidebar />
+          </View>
+        )}
+      </View>
     </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
-  safe:    { flex: 1, backgroundColor: colors.pageBg, overflow: "visible" },
+  safe:  { flex: 1, backgroundColor: colors.pageBg, overflow: "visible" },
 
-  navbar:  {
+  navbar: {
     height: NAV_HEIGHT,
     backgroundColor: colors.cardBg,
     borderBottomWidth: 1,
@@ -170,14 +169,14 @@ const s = StyleSheet.create({
   logoLabel: { color: colors.blue, fontWeight: "900", fontSize: 15 },
 
   // Tabs
-  tabsRow:       { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 2 },
-  tab:           { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: space.md, paddingVertical: space.sm, borderRadius: radius.sm },
-  tabActive:     { backgroundColor: colors.darkBtn },
-  tabPressed:    { opacity: 0.7 },
-  tabIcon:       { fontSize: 14, color: colors.subtext },
-  tabIconActive: { color: "#FFFFFF" },
-  tabLabel:      { fontSize: 13, fontWeight: "700", color: "#374151" },
-  tabLabelActive:{ color: "#FFFFFF", fontWeight: "700", fontSize: 13 },
+  tabsRow:        { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 2 },
+  tab:            { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: space.md, paddingVertical: space.sm, borderRadius: radius.sm },
+  tabActive:      { backgroundColor: colors.darkBtn },
+  tabPressed:     { opacity: 0.7 },
+  tabIcon:        { fontSize: 14, color: colors.subtext },
+  tabIconActive:  { color: "#FFFFFF" },
+  tabLabel:       { fontSize: 13, fontWeight: "700", color: "#374151" },
+  tabLabelActive: { color: "#FFFFFF", fontWeight: "700", fontSize: 13 },
 
   // User pill
   userWrap:   { flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: space.sm, paddingVertical: 6, borderRadius: radius.sm },
@@ -191,16 +190,18 @@ const s = StyleSheet.create({
   hamburgerLine: { width: 20, height: 2, backgroundColor: "#374151", borderRadius: 2 },
 
   // Mobile modal
-  overlay:         { flex: 1, backgroundColor: "rgba(0,0,0,0.3)", justifyContent: "flex-start", alignItems: "flex-end", paddingTop: NAV_HEIGHT + 8, paddingRight: space.lg },
-  mobileMenu:      { backgroundColor: colors.cardBg, borderRadius: radius.input, borderWidth: 1, borderColor: colors.borderFaint, minWidth: 180, overflow: "hidden", ...shadow.dropdown },
-  mobileItem:      { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: space.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.borderFaint },
-  mobileItemActive:{ backgroundColor: colors.purpleLight },
-  mobileIcon:      { fontSize: 16, color: colors.subtext },
-  mobileLabel:     { fontSize: 14, fontWeight: "700", color: "#374151" },
+  overlay:          { flex: 1, backgroundColor: "rgba(0,0,0,0.3)", justifyContent: "flex-start", alignItems: "flex-end", paddingTop: NAV_HEIGHT + 8, paddingRight: space.lg },
+  mobileMenu:       { backgroundColor: colors.cardBg, borderRadius: radius.input, borderWidth: 1, borderColor: colors.borderFaint, minWidth: 180, overflow: "hidden", ...shadow.dropdown },
+  mobileItem:       { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: space.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.borderFaint },
+  mobileItemActive: { backgroundColor: colors.purpleLight },
+  mobileIcon:       { fontSize: 16, color: colors.subtext },
+  mobileLabel:      { fontSize: 14, fontWeight: "700", color: "#374151" },
   mobileLabelActive:{ color: colors.purpleDark },
 
-  // Content
+  // Body + sidebar
+  body:    { flex: 1, flexDirection: "row", overflow: "visible" },
   content: { flex: 1, zIndex: 1 },
+  sidebar: { width: 320, backgroundColor: colors.cardBg, borderLeftWidth: 1, borderLeftColor: colors.borderFaint },
 
   // User dropdown
   userDropdown: { position: "absolute", top: 44, right: 0, backgroundColor: colors.cardBg, borderRadius: radius.input, borderWidth: 1, borderColor: colors.borderFaint, minWidth: 180, zIndex: 999, ...shadow.dropdown },

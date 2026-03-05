@@ -4,11 +4,19 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from app.auth import decode_token
 from app.database import users_col
 
+try:
+    from jose import JWTError
+except Exception:
+    JWTError = Exception
+
 bearer = HTTPBearer(auto_error=True)
 
 def get_current_user(creds: HTTPAuthorizationCredentials = Depends(bearer)) -> dict:
     token = creds.credentials
-    payload = decode_token(token)
+    try:
+        payload = decode_token(token)
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
 
     user_id = payload.get("sub")
     if not user_id:

@@ -9,6 +9,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
+import { router } from "expo-router";
 import { apiGet } from "../../lib/api";
 
 type Outcome = "Passed" | "Failed";
@@ -61,7 +62,7 @@ export default function RecordsScreen() {
       setLoading(true);
       const [l, r] = await Promise.all([
         apiGet("/instructor/learners"),
-        apiGet("/records"), // ✅ you will add this endpoint
+        apiGet("/records/instructor"),
       ]);
       setLearners(Array.isArray(l) ? l : []);
       setRecordsRaw(Array.isArray(r) ? r : []);
@@ -86,20 +87,20 @@ export default function RecordsScreen() {
     return m;
   }, [learners]);
 
-  // expected backend records rows shape (recommended):
-  // [{ trainee_id, last_session_at, vehicle_id, score, outcome, label }]
+  // Backend returns results_col docs:
+  // { session_id, trainee_id, instructor_id, created_at, dataset_used: { csv }, analysis: { overall, behavior } }
   const all: LearnerRecord[] = useMemo(() => {
     return recordsRaw.map((x: any) => {
-      const traineeId = x?.trainee_id || x?.learner_id || "";
+      const traineeId = x?.trainee_id || "";
       const name = nameById[traineeId] || traineeId || "—";
-      const score = typeof x?.score === "number" ? x.score : 0;
-      const outcome: Outcome = (x?.outcome || (score >= 70 ? "Passed" : "Failed")) as Outcome;
-      const vehicle = x?.vehicle_id || "—";
-      const last = x?.last_session_at ? new Date(x.last_session_at).toLocaleDateString() : "—";
-      const profile = profileFromLabel(x?.label);
+      const score = Math.round(typeof x?.analysis?.overall === "number" ? x.analysis.overall : 0);
+      const outcome: Outcome = (score >= 70 ? "Passed" : "Failed") as Outcome;
+      const vehicle = x?.dataset_used?.csv || "—";
+      const last = x?.created_at ? new Date(x.created_at).toLocaleDateString() : "—";
+      const profile = profileFromLabel(x?.analysis?.behavior);
 
       return {
-        id: `${traineeId}-${vehicle}-${last}`,
+        id: x?.session_id || `${traineeId}-${last}`,
         learnerId: traineeId,
         initials: initialsFromName(name),
         name,
@@ -150,8 +151,7 @@ export default function RecordsScreen() {
   const pageItems = filtered.slice(startIndex, endIndex);
 
   const onView = (r: LearnerRecord) => {
-    Alert.alert("Report", `Open report for ${r.name} (${r.learnerId})`);
-    // later: router.push(`/records/${r.learnerId}`)
+    router.push(`/student/${r.learnerId}` as any);
   };
 
   const toggleOutcome = () =>
@@ -262,7 +262,7 @@ export default function RecordsScreen() {
             <TextInput
               value={search}
               onChangeText={setSearch}
-              placeholder="Search by name, ID, or vehicle..."
+              placeholder="Search by name or ID..."
               placeholderTextColor="#98A2B3"
               style={styles.searchInput}
             />

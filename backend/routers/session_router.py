@@ -1,7 +1,7 @@
 """
 DriveIQ - Session Processing Router (Sync PyMongo)
 ====================================================
-Integrates Lorna's ML pipeline with the existing backend.
+Integrates ML pipeline with the existing backend.
 
 Uses existing collections from database.py:
   - sessions_col  → session metadata + ML summary

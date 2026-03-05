@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import {
-  View, Text, StyleSheet, ScrollView, Pressable,
+  View, Text, StyleSheet, ScrollView, Pressable, Modal, Alert,
   useWindowDimensions, ActivityIndicator,
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { apiGet } from "../../lib/api";
+import { apiGet, apiDelete } from "../../lib/api";
 import { colors, type_, radius, space, shadow, card, btn, pill, page, divider, tint, TintKey } from "../../lib/theme";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -22,9 +22,12 @@ export default function Dashboard() {
   const { width } = useWindowDimensions();
   const isWide = width >= 900;
 
-  const [loading, setLoading] = useState(true);
-  const [dash, setDash]       = useState<any>(null);
-  const [storedName, setStoredName] = useState("");
+  const [loading, setLoading]           = useState(true);
+  const [dash, setDash]                 = useState<any>(null);
+  const [storedName, setStoredName]     = useState("");
+  const [manageBooking, setManageBooking] = useState<any>(null);
+  const [cancelledIds, setCancelledIds] = useState<Set<string>>(new Set());
+  const [toast, setToast]               = useState<string | null>(null);
 
   async function loadDashboard() {
     try {
@@ -42,6 +45,30 @@ export default function Dashboard() {
     }
   }
 
+  function showToast(msg: string) {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3000);
+  }
+
+  async function requestCancel() {
+    if (!manageBooking) return;
+    const bookingId = manageBooking.booking_id;
+    if (!bookingId) { showToast("Missing booking ID"); return; }
+
+    // Optimistic: close modal + remove from list immediately
+    setManageBooking(null);
+    setCancelledIds((prev) => new Set([...prev, bookingId]));
+    showToast("Booking cancelled");
+
+    // Fire API in background; roll back if it fails
+    try {
+      await apiDelete(`/bookings/${bookingId}`);
+    } catch (e: any) {
+      setCancelledIds((prev) => { const n = new Set(prev); n.delete(bookingId); return n; });
+      showToast(e?.message || "Failed to cancel — please try again");
+    }
+  }
+
   useEffect(() => { loadDashboard(); }, []);
   useFocusEffect(useCallback(() => { loadDashboard(); }, []));
 
@@ -55,21 +82,28 @@ export default function Dashboard() {
   const goalText           = dash?.progress?.goal_text ?? "Complete sessions to unlock your next badge";
   const instructorName     = dash?.link?.instructor?.name ?? dash?.link?.instructor?.instructor_name ?? "—";
 
-  const upcoming = useMemo(() => {
-    const u = dash?.upcoming_session;
-    if (!u) return null;
-    const dateISO   = u?.dateISO || u?.date_iso || u?.date || "";
-    const dateLabel = u?.dateLabel || u?.date_label || (dateISO ? new Date(dateISO).toLocaleDateString() : "—");
-    const timeLabel = u?.timeLabel || u?.time_label || u?.time || "—";
-    const instructor= u?.instructor || u?.instructor_name || instructorName || "—";
-    const vehicle   = u?.vehicle || u?.vehicle_id || "—";
-    return { dateISO, dateLabel, timeLabel, instructor, vehicle };
-  }, [dash, instructorName]);
+  const upcomingList = useMemo(() => {
+    // Prefer the new list field; fall back to the single-item field for old API
+    const list: any[] = Array.isArray(dash?.upcoming_sessions)
+      ? dash.upcoming_sessions
+      : dash?.upcoming_session
+      ? [dash.upcoming_session]
+      : [];
+    return list
+      .filter((u: any) => !cancelledIds.has(u?.booking_id))
+      .map((u: any) => {
+        const dateISO   = u?.dateISO || u?.date_iso || u?.date || "";
+        const dateLabel = u?.dateLabel || u?.date_label || (dateISO ? new Date(dateISO).toLocaleDateString() : "—");
+        const timeLabel = u?.timeLabel || u?.time_label || u?.time || "—";
+        const instructor= u?.instructor || u?.instructor_name || "—";
+        return { booking_id: u?.booking_id, dateISO, dateLabel, timeLabel, instructor };
+      });
+  }, [dash, cancelledIds]);
 
-  const countdownLabel = useMemo(() => {
-    if (!upcoming?.dateISO) return "—";
+  function countdownFor(dateISO: string) {
+    if (!dateISO || dateISO === "—") return "—";
     const now  = new Date();
-    const d    = new Date(upcoming.dateISO + "T00:00:00");
+    const d    = new Date(dateISO + "T00:00:00");
     const ms   = d.getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     const days = Math.round(ms / (1000 * 60 * 60 * 24));
     if (Number.isNaN(days)) return "—";
@@ -77,7 +111,7 @@ export default function Dashboard() {
     if (days === 1) return "Tomorrow";
     if (days === 0) return "Today";
     return "Session passed";
-  }, [upcoming?.dateISO]);
+  }
 
   // Only show real reports from the API — no hardcoded fallback data
   const reports: RecentReport[] = useMemo(() => {
@@ -140,6 +174,7 @@ export default function Dashboard() {
   }
 
   return (
+    <View style={{ flex: 1 }}>
     <ScrollView style={s.page} contentContainerStyle={s.content}>
 
       {/* ── 1. Hero ───────────────────────────────────────────────────────── */}
@@ -198,34 +233,37 @@ export default function Dashboard() {
           </View>
         </View>
 
-        {/* Upcoming session */}
+        {/* Upcoming sessions */}
         <View style={divider.base} />
-        <SectionHeader icon="🗓️" iconBg={colors.greenBorderAlt} label="Upcoming Session" />
+        <SectionHeader icon="🗓️" iconBg={colors.greenBorderAlt} label={`Upcoming Sessions${upcomingList.length > 0 ? ` (${upcomingList.length})` : ""}`} />
 
-        {upcoming ? (
-          <>
-            <View style={[s.upcomingRow, isWide && { flexDirection: "row" }]}>
-              <InfoPill label="Date"       value={upcoming.dateLabel}  icon="🗓️" bg={tint.indigo.bg} border={tint.indigo.border} />
-              <InfoPill label="Time"       value={upcoming.timeLabel}  icon="🕑" bg={tint.purple.bg} border={tint.purple.border} />
-              <InfoPill label="Instructor" value={upcoming.instructor} icon="👤" bg={tint.green.bg}  border={tint.green.border}  />
-              <InfoPill label="Vehicle"    value={upcoming.vehicle}    icon="🚘" bg={tint.yellow.bg} border={colors.yellowBorder} />
-            </View>
-            <View style={s.countdownRow}>
-              <Text style={s.countdownText}>🕒 {countdownLabel}</Text>
-              <Pressable
-                onPress={() => router.push("/(studenttabs)/sessions")}
-                style={({ pressed }) => [s.outlineBtn, { marginTop: 0 }, pressed && { opacity: 0.8 }]}
-              >
-                <Text style={s.outlineBtnText}>Reschedule</Text>
-              </Pressable>
-            </View>
-          </>
-        ) : (
+        {upcomingList.length === 0 ? (
           <View style={s.emptyBox}>
             <Text style={s.emptyText}>No upcoming sessions scheduled.</Text>
-            <Pressable onPress={() => router.push("/(studenttabs)/sessions")} style={[s.outlineBtn, { marginTop: 0 }]}>
-              <Text style={s.outlineBtnText}>View Sessions</Text>
+            <Pressable onPress={() => router.navigate("/(studenttabs)/sessions" as any)} style={[s.outlineBtn, { marginTop: 0 }]}>
+              <Text style={s.outlineBtnText}>Book a Session</Text>
             </Pressable>
+          </View>
+        ) : (
+          <View style={{ gap: 10, marginTop: 10 }}>
+            {upcomingList.map((u, idx) => (
+              <View key={u.booking_id || idx} style={s.upcomingCard}>
+                <View style={[s.upcomingRow, isWide && { flexDirection: "row" }]}>
+                  <InfoPill label="Date"       value={u.dateLabel}  icon="🗓️" bg={tint.indigo.bg} border={tint.indigo.border} />
+                  <InfoPill label="Time"       value={u.timeLabel}  icon="🕑" bg={tint.purple.bg} border={tint.purple.border} />
+                  <InfoPill label="Instructor" value={u.instructor} icon="👤" bg={tint.green.bg}  border={tint.green.border}  />
+                </View>
+                <View style={s.countdownRow}>
+                  <Text style={s.countdownText}>🕒 {countdownFor(u.dateISO)}</Text>
+                  <Pressable
+                    onPress={() => setManageBooking(u)}
+                    style={({ pressed }) => [s.outlineBtn, { marginTop: 0 }, pressed && { opacity: 0.8 }]}
+                  >
+                    <Text style={s.outlineBtnText}>Manage →</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ))}
           </View>
         )}
       </View>
@@ -260,7 +298,7 @@ export default function Dashboard() {
                     <Pressable
                       onPress={() => router.push({
                         pathname: "/(studenttabs)/session-report",
-                        params: { sessionId: r.session_id },
+                        params: { sessionId: r.session_id, from: "dashboard" },
                       })}
                       style={({ pressed }) => [s.outlineBtn, { marginTop: 0, paddingHorizontal: 12, paddingVertical: 8 }, pressed && { opacity: 0.8 }]}
                     >
@@ -363,6 +401,50 @@ export default function Dashboard() {
 
       <Text style={s.footer}>© 2025 DriveIQ · Student Portal</Text>
     </ScrollView>
+
+    {/* ── Toast ────────────────────────────────────────────────────── */}
+    {toast && (
+      <View style={s.toast} pointerEvents="none">
+        <Text style={s.toastText}>{toast}</Text>
+      </View>
+    )}
+
+    {/* ── Manage Booking Modal ─────────────────────────────────────── */}
+    <Modal visible={!!manageBooking} animationType="fade" transparent onRequestClose={() => setManageBooking(null)}>
+      <View style={s.manageOverlay}>
+        <View style={s.manageCard}>
+          <View style={s.manageHeader}>
+            <Text style={s.manageTitle}>Session Details</Text>
+            <Pressable onPress={() => setManageBooking(null)}>
+              <Text style={s.manageClose}>✕</Text>
+            </Pressable>
+          </View>
+
+          {manageBooking && (
+            <>
+              <InfoPill label="Date"       value={manageBooking.dateLabel}  icon="🗓️" bg={tint.indigo.bg}  border={tint.indigo.border}  />
+              <View style={{ height: 10 }} />
+              <InfoPill label="Time"       value={manageBooking.timeLabel}  icon="🕑" bg={tint.purple.bg}  border={tint.purple.border}  />
+              <View style={{ height: 10 }} />
+              <InfoPill label="Instructor" value={manageBooking.instructor} icon="👤" bg={tint.green.bg}   border={tint.green.border}   />
+
+              <Text style={s.manageCountdown}>🕒 {countdownFor(manageBooking.dateISO)}</Text>
+
+              <View style={s.manageDivider} />
+
+              <Pressable onPress={requestCancel} style={s.cancelReqBtn}>
+                <Text style={s.cancelReqText}>Request Cancellation</Text>
+              </Pressable>
+
+              <Pressable onPress={() => setManageBooking(null)} style={s.manageCloseBtn}>
+                <Text style={s.manageCloseBtnText}>Close</Text>
+              </Pressable>
+            </>
+          )}
+        </View>
+      </View>
+    </Modal>
+  </View>
   );
 }
 
@@ -460,7 +542,8 @@ const s = StyleSheet.create({
   goalTitle:   { fontSize: 12, fontWeight: "900", color: colors.blueDark },
   goalText:    { fontSize: 11, fontWeight: "700", color: colors.blueDeep, marginTop: 3 },
 
-  upcomingRow:   { flexDirection: "column", gap: 12, marginTop: 12 },
+  upcomingCard:  { borderWidth: 1, borderColor: colors.border, borderRadius: radius.input, padding: space.md, backgroundColor: colors.cardBg, gap: 10 },
+  upcomingRow:   { flexDirection: "column", gap: 10 },
   countdownRow:  { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 14 },
   countdownText: { fontSize: 12, fontWeight: "900", color: colors.blue },
   emptyBox:      { marginTop: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: space.md, backgroundColor: colors.pageBg, borderRadius: radius.input },
@@ -526,4 +609,21 @@ const s = StyleSheet.create({
   outlineBtnText: { ...type_.btnOutline },
 
   footer: { ...type_.footer, marginTop: 8 },
+
+  // Manage booking modal
+  manageOverlay:      { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", padding: 24 },
+  manageCard:         { backgroundColor: colors.cardBg, borderRadius: radius.cardXl, padding: 24 },
+  manageHeader:       { flexDirection: "row" as any, alignItems: "center" as any, justifyContent: "space-between" as any, marginBottom: 20 },
+  manageTitle:        { fontWeight: "900" as any, fontSize: 18, color: colors.textAlt },
+  manageClose:        { fontSize: 22, color: colors.subtext, padding: 4 },
+  manageCountdown:    { fontSize: 13, fontWeight: "900" as any, color: colors.blue, marginTop: 14 },
+  manageDivider:      { height: 1, backgroundColor: colors.border, marginVertical: 16 },
+  cancelReqBtn:       { backgroundColor: colors.redDark, borderRadius: radius.input, paddingVertical: 14, alignItems: "center" as any, marginBottom: 10 },
+  cancelReqText:      { color: "#FFF", fontWeight: "900" as any, fontSize: 14 },
+  manageCloseBtn:     { borderWidth: 1, borderColor: colors.border, borderRadius: radius.input, paddingVertical: 12, alignItems: "center" as any },
+  manageCloseBtnText: { fontWeight: "900" as any, fontSize: 13, color: colors.textAlt },
+
+  // Toast
+  toast:     { position: "absolute" as any, bottom: 40, alignSelf: "center" as any, backgroundColor: "#1F2937", borderRadius: 999, paddingHorizontal: 20, paddingVertical: 10, zIndex: 9999 },
+  toastText: { color: "#FFF", fontWeight: "700" as any, fontSize: 13 },
 });

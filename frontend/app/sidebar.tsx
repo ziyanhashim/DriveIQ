@@ -1,7 +1,7 @@
 import React from "react";
 import { SafeAreaView, View, StyleSheet, Pressable, Text } from "react-native";
 import { router } from "expo-router";
-import InstructorSidebar from "./components/InstructorSidebar";
+import InstructorSidebar from "../components/InstructorSidebar";
 
 export default function SidebarScreen() {
   return (

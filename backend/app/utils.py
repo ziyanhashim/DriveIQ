@@ -1,5 +1,18 @@
 from datetime import datetime
 from bson import ObjectId
+from fastapi import HTTPException
+
+
+def now_utc() -> datetime:
+    return datetime.utcnow()
+
+
+def oid(x: str) -> ObjectId:
+    try:
+        return ObjectId(x)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid id")
+
 
 def to_jsonable(obj):
     """

@@ -456,15 +456,18 @@ export default function SessionsScreen() {
                                   <Text style={s.scheduleColHeader}>{dateKey}</Text>
                                   {byDate[dateKey].map(slot => {
                                     const selected = selectedSlot?.slot_id === slot.slot_id;
+                                    const isBooked = slot.status !== "open";
                                     return (
                                       <Pressable
                                         key={slot.slot_id}
-                                        style={[s.scheduleSlot, selected && s.scheduleSlotSelected]}
-                                        onPress={() => setSelectedSlot(slot)}
+                                        style={[s.scheduleSlot, selected && s.scheduleSlotSelected, isBooked && s.scheduleSlotBooked]}
+                                        onPress={() => !isBooked && setSelectedSlot(slot)}
+                                        disabled={isBooked}
                                       >
-                                        <Text style={[s.scheduleSlotText, selected && { color: "#FFF" }]}>
+                                        <Text style={[s.scheduleSlotText, selected && { color: "#FFF" }, isBooked && { color: "#9CA3AF" }]}>
                                           {fmtTime(slot.start_time)}
                                         </Text>
+                                        {isBooked && <Text style={s.scheduleSlotBookedLabel}>Unavailable</Text>}
                                       </Pressable>
                                     );
                                   })}
@@ -658,8 +661,10 @@ const s = StyleSheet.create({
   scheduleCol:         { alignItems: "center", minWidth: 80 },
   scheduleColHeader:   { fontWeight: "900", fontSize: 11, color: colors.textAlt, marginBottom: 8, textAlign: "center" },
   scheduleSlot:        { borderWidth: 1, borderColor: colors.border, borderRadius: radius.input, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: colors.pageBg, marginBottom: 6, width: "100%" as any, alignItems: "center" },
-  scheduleSlotSelected:{ backgroundColor: colors.purpleDark, borderColor: colors.purpleDark },
-  scheduleSlotText:    { fontWeight: "700", fontSize: 12, color: colors.label },
+  scheduleSlotSelected:    { backgroundColor: colors.purpleDark, borderColor: colors.purpleDark },
+  scheduleSlotBooked:      { backgroundColor: "#F3F4F6", borderColor: "#E5E7EB", opacity: 0.7 },
+  scheduleSlotText:        { fontWeight: "700", fontSize: 12, color: colors.label },
+  scheduleSlotBookedLabel: { fontSize: 9, fontWeight: "700", color: "#9CA3AF", marginTop: 1 },
 
   // Booking summary
   bookingSummary:     { backgroundColor: "#EFF6FF", borderWidth: 1, borderColor: "#BFDBFE", borderRadius: radius.card, padding: 14, marginBottom: 16 },

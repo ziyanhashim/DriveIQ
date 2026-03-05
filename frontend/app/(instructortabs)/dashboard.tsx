@@ -94,9 +94,6 @@ export default function DashboardScreen() {
   const [loading, setLoading] = useState(true);
   const [dash, setDash] = useState<any>(null);
 
-  const [learners, setLearners] = useState<any[]>([]);
-  const [sessions, setSessions] = useState<any[]>([]);
-
   const [isActive, setIsActive] = useState(false);
   const [durationSec, setDurationSec] = useState(0);
   const [audioVisual, setAudioVisual] = useState(true);
@@ -104,20 +101,10 @@ export default function DashboardScreen() {
   async function loadAll() {
     try {
       setLoading(true);
-
-      const [d, l, s] = await Promise.all([
-        apiGet("/dashboard/instructor"),
-        apiGet("/instructor/learners"),
-        apiGet("/sessions"),
-      ]);
-
+      const d = await apiGet("/dashboard/instructor");
       setDash(d);
-      setLearners(Array.isArray(l) ? l : []);
-      setSessions(Array.isArray(s) ? s : []);
     } catch (e: any) {
       setDash(null);
-      setLearners([]);
-      setSessions([]);
       Alert.alert("Dashboard Error", e?.message || "Failed to load dashboard");
     } finally {
       setLoading(false);
@@ -135,41 +122,25 @@ export default function DashboardScreen() {
   );
 
   const summary = dash?.summary || {};
-  const joinCode = dash?.join_code || "—";
+  const totalLearners = typeof summary.total_learners === "number" ? summary.total_learners : 0;
+  const avgScore = typeof summary.avg_score === "number" ? summary.avg_score : 0;
+  const totalSessions = typeof summary.total_sessions === "number" ? summary.total_sessions : 0;
+  const rating = typeof summary.rating === "number" ? summary.rating : 0;
+  const totalReviews = typeof summary.total_reviews === "number" ? summary.total_reviews : 0;
 
-  const sessionRating = typeof summary?.avg_score === "number" ? summary.avg_score : 0;
-  const passed = typeof summary?.passed === "number" ? summary.passed : 0;
-  const failed = typeof summary?.failed === "number" ? summary.failed : 0;
-  const totalLearners = typeof summary?.total_learners === "number" ? summary.total_learners : learners.length;
+  // Active session comes directly from the dashboard response
+  const liveSession = dash?.active_session || null;
 
-  // pick a “live” session: nearest upcoming by scheduled_at
-  const liveSession = useMemo(() => {
-    const now = Date.now();
-    const upcoming = sessions
-      .map((x) => ({ ...x, ms: safeParseMs(x?.scheduled_at) }))
-      .filter((x) => x.ms >= now)
-      .sort((a, b) => a.ms - b.ms);
-    return upcoming[0] || null;
-  }, [sessions]);
-
-  const traineeNameById = useMemo(() => {
-    const m: Record<string, string> = {};
-    for (const l of learners) {
-      if (l?.user_id) m[l.user_id] = l?.name || "";
-    }
-    return m;
-  }, [learners]);
-
-  const vehicleId = liveSession?.vehicle_id || "—";
+  const studentName = liveSession?.trainee_name || "—";
+  const studentInitials = initialsFromName(studentName);
   const traineeId = liveSession?.trainee_id || "";
-  const studentName = traineeId ? (traineeNameById[traineeId] || traineeId) : "—";
-  const studentInitials = traineeId ? initialsFromName(traineeNameById[traineeId] || traineeId) : "—";
+  const vehicleId = liveSession?.vehicle_id || liveSession?.road_type || "—";
 
-  const scheduledAtMs = safeParseMs(liveSession?.scheduled_at);
+  // Timer starts from session's actual started_at timestamp
+  const startedAtMs = safeParseMs(liveSession?.started_at);
   const liveStatusLabel = liveSession ? "Active" : "No Active Session";
 
   useEffect(() => {
-    // very simple timer mock if you want “live”
     if (!liveSession) {
       setIsActive(false);
       setDurationSec(0);
@@ -177,19 +148,22 @@ export default function DashboardScreen() {
     }
     setIsActive(true);
 
-    const start = Date.now();
+    const startMs = startedAtMs > 0 ? startedAtMs : Date.now();
+    // Set initial value immediately
+    setDurationSec(Math.floor((Date.now() - startMs) / 1000));
+
     const t = setInterval(() => {
-      setDurationSec(Math.floor((Date.now() - start) / 1000));
+      setDurationSec(Math.floor((Date.now() - startMs) / 1000));
     }, 1000);
 
     return () => clearInterval(t);
-  }, [liveSession]);
+  }, [liveSession?.session_id, startedAtMs]);
 
   const ratingLabel = useMemo(() => {
-    if (sessionRating >= 85) return "Excellent";
-    if (sessionRating >= 70) return "Good";
+    if (avgScore >= 85) return "Excellent";
+    if (avgScore >= 70) return "Good";
     return "Needs Work";
-  }, [sessionRating]);
+  }, [avgScore]);
 
   const alerts: AlertItem[] = useMemo(() => {
     const n = dash?.alerts?.high_severity_events ?? 0;
@@ -216,20 +190,18 @@ export default function DashboardScreen() {
   }, [dash]);
 
   const scoreSeries = useMemo(() => {
-    // still mock unless backend returns history
     return [75, 72, 68, 71, 79, 82];
   }, []);
 
-  const safePct = 87; // still mock (unless backend provides)
+  const safePct = 87;
   const durationLabel = formatDuration(durationSec);
 
   const onPause = () => setIsActive((v) => !v);
   const onEnd = () => {
-    setIsActive(false);
-    setDurationSec(0);
+    router.push("/(instructortabs)/sessions" as any);
   };
   const onFlag = () => {
-    router.push("/records");
+    router.push("/(instructortabs)/records" as any);
   };
 
   if (loading) {
@@ -243,13 +215,20 @@ export default function DashboardScreen() {
 
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.content}>
+      {/* Overview card — replaces old join code card */}
       <View style={styles.card}>
         <View style={styles.joinRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.sectionTitle}>Instructor Join Code</Text>
-            <Text style={styles.joinCode}>{joinCode}</Text>
-            <Text style={styles.joinSub}>Learners linked: {totalLearners}</Text>
-            <Text style={styles.joinSub}>Passed: {passed} • Failed: {failed}</Text>
+            <Text style={styles.sectionTitle}>Overview</Text>
+            <View style={styles.statsGrid}>
+              <StatChip label="Learners" value={String(totalLearners)} />
+              <StatChip label="Sessions" value={String(totalSessions)} />
+              <StatChip label="Avg Score" value={`${avgScore}`} />
+              <StatChip label="Rating" value={rating ? rating.toFixed(1) : "—"} />
+              {totalReviews > 0 ? (
+                <StatChip label="Reviews" value={String(totalReviews)} />
+              ) : null}
+            </View>
           </View>
           <Pressable
             onPress={loadAll}
@@ -260,7 +239,7 @@ export default function DashboardScreen() {
         </View>
       </View>
 
-      {/* Live Training Session (NOW REAL: based on nearest upcoming session) */}
+      {/* Live Training Session */}
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Live Training Session</Text>
 
@@ -276,9 +255,9 @@ export default function DashboardScreen() {
               <Text style={styles.statusText}>{liveStatusLabel}</Text>
             </View>
 
-            {liveSession && scheduledAtMs ? (
+            {liveSession && startedAtMs ? (
               <Text style={[styles.joinSub, { marginTop: 10 }]}>
-                Scheduled: {new Date(scheduledAtMs).toLocaleString()}
+                Started: {new Date(startedAtMs).toLocaleTimeString()}
               </Text>
             ) : null}
           </View>
@@ -290,7 +269,7 @@ export default function DashboardScreen() {
                   <Text style={styles.metaIcon}>🚗</Text>
                 </View>
                 <View>
-                  <Text style={styles.metaLabel}>Vehicle ID</Text>
+                  <Text style={styles.metaLabel}>Road Type</Text>
                   <Text style={styles.metaValue}>{vehicleId}</Text>
                 </View>
               </View>
@@ -298,7 +277,7 @@ export default function DashboardScreen() {
               <Pressable
                 onPress={() => {
                   if (!traineeId) return;
-                  router.push(`/student/${traineeId}`);
+                  router.push(`/student/${traineeId}` as any);
                 }}
                 style={({ pressed }) => [styles.metaItem, pressed ? { opacity: 0.85 } : null]}
                 hitSlop={8}
@@ -394,7 +373,7 @@ export default function DashboardScreen() {
               <Text style={styles.sectionTitle}>Performance Summary</Text>
 
               <View style={styles.ratingWrap}>
-                <Text style={styles.ratingValue}>{sessionRating || 0}</Text>
+                <Text style={styles.ratingValue}>{avgScore || 0}</Text>
                 <View style={styles.ratingPill}>
                   <Text style={styles.ratingPillText}>{ratingLabel}</Text>
                 </View>
@@ -483,6 +462,15 @@ export default function DashboardScreen() {
   );
 }
 
+function StatChip({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.statChip}>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
 function LineDots({ values }: { values: number[] }) {
   const min = Math.min(...values);
   const max = Math.max(...values);
@@ -546,8 +534,21 @@ const styles = StyleSheet.create({
   cardTitle: { color: "#101828", fontWeight: "900", fontSize: 13 },
 
   joinRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
-  joinCode: { marginTop: 8, fontSize: 18, fontWeight: "900", color: "#0B1220", letterSpacing: 1 },
   joinSub: { marginTop: 6, color: "#667085", fontWeight: "800", fontSize: 11 },
+
+  statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 },
+  statChip: {
+    backgroundColor: "#F9FAFB",
+    borderWidth: 1,
+    borderColor: "#EAECF0",
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignItems: "center",
+    minWidth: 64,
+  },
+  statValue: { color: "#101828", fontWeight: "900", fontSize: 16 },
+  statLabel: { color: "#667085", fontWeight: "800", fontSize: 10, marginTop: 2 },
 
   refreshBtn: {
     borderRadius: 12,

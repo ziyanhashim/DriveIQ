@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import bcrypt
 
 try:
@@ -23,7 +23,7 @@ def create_access_token(subject: str, extra: dict | None = None) -> str:
     if jwt is None:
         raise RuntimeError("Missing dependency: python-jose. Install with: pip install python-jose")
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     payload = {
         "sub": subject,
         "iat": int(now.timestamp()),

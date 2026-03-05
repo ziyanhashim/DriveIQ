@@ -289,7 +289,7 @@ export default function ReportsListScreen() {
                 onPress={() =>
                   router.push({
                     pathname: "/(studenttabs)/session-report",
-                    params: { sessionId: session.session_id },
+                    params: { sessionId: session.session_id, from: "reports" },
                   })
                 }
               />
