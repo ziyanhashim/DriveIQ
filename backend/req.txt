@@ -9,3 +9,5 @@ pydantic[email]
 python-jose[cryptography]
 passlib[bcrypt]
 joblib
+python-multipart
+scikit-learn

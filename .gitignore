@@ -29,6 +29,12 @@ node_modules/
 # Expo
 frontend/.expo/web/
 
+# Claude Code
+CLAUDE.md
+
+# Dev scripts
+start-dev.sh
+
 # OS Files
 .DS_Store
 Thumbs.db

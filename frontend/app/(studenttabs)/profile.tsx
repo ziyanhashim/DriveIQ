@@ -1,12 +1,17 @@
 import React, { useEffect, useState, useCallback } from "react";
 import {
-  View, Text, StyleSheet, ScrollView, ActivityIndicator,
+  View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiGet } from "../../lib/api";
-import { colors, type_, radius, space, card, page, divider } from "../../lib/theme";
+import { colors, fonts, type_, radius, space, card, page, divider, tint } from "../../lib/theme";
+import FadeInView from "../../components/FadeInView";
+
+// Shared components
+import PerformanceMatrix, { MatrixRow } from "../../components/PerformanceMatrix";
+import EmptyState from "../../components/EmptyState";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -31,6 +36,7 @@ export default function Profile() {
   const [storedName, setStoredName]     = useState("");
   const [storedEmail, setStoredEmail]   = useState("");
   const [storedMobile, setStoredMobile] = useState("");
+  const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set());
 
   async function loadProfile() {
     try {
@@ -55,7 +61,7 @@ export default function Profile() {
   useEffect(() => { loadProfile(); }, []);
   useFocusEffect(useCallback(() => { loadProfile(); }, []));
 
-  // ── Derived values — no hardcoded fallback data ─────────────────────────────
+  // ── Derived values ─────────────────────────────────────────────────────
   const fullName            = dash?.welcome?.name || storedName || "—";
   const email               = storedEmail || "—";
   const mobile              = storedMobile || "—";
@@ -66,14 +72,11 @@ export default function Profile() {
   const currentDrivingScore = dash?.progress?.current_score ?? 0;
   const instructorName      = dash?.link?.instructor?.name || dash?.link?.instructor?.instructor_name || "—";
 
-  // Only show real data from API — no hardcoded fallbacks
   const badges: Badge[] = Array.isArray(dash?.achievements)
     ? dash.achievements.filter((a: any) => a.earned).map((a: any, i: number) => ({
         id: a.id || `b-${i}`, title: a.title || "Badge", level: a.level || "Bronze", emoji: a.icon || "🏅",
       }))
     : [];
-
-  const earnedBadgesChips = badges.slice(0, 3).map((b) => b.title);
 
   const instructorHistory: InstructorHistory[] = Array.isArray(dash?.instructor_history)
     ? dash.instructor_history : [];
@@ -82,11 +85,41 @@ export default function Profile() {
     ? dash.milestones : [];
 
   const sessionsProgress = pct(sessionsCompleted, sessionsTotal);
-  const scoreProgress    = currentDrivingScore / 100;
   const earnedCount      = milestones.filter((m) => m.status === "Earned").length;
   const motivationBody   = sessionsTotal > 0
     ? `You're ${Math.round(sessionsProgress * 100)}% through your training program. ${Math.max(0, milestones.length - earnedCount)} more achievements to unlock!`
     : "Complete your first session to start tracking your progress.";
+
+  // Performance matrix rows
+  const progressRows: MatrixRow[] = [
+    {
+      label: "Sessions",
+      value: sessionsTotal > 0 ? `${sessionsCompleted}/${sessionsTotal}` : `${sessionsCompleted}`,
+      maxValue: sessionsTotal > 0 ? sessionsTotal : undefined,
+      ...(sessionsTotal > 0 ? {} : {}),
+    },
+    {
+      label: "Driving Score",
+      value: currentDrivingScore > 0 ? `${currentDrivingScore}%` : "—",
+      maxValue: 100,
+    },
+    {
+      label: "Badges Earned",
+      value: badges.length,
+    },
+    {
+      label: "Status",
+      value: status,
+    },
+  ];
+
+  function toggleNotes(id: string) {
+    setExpandedNotes((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
 
   if (loading) {
     return (
@@ -110,6 +143,7 @@ export default function Profile() {
       </View>
 
       {/* ── Personal Information ─────────────────────────────────────────── */}
+      <FadeInView delay={0}>
       <View style={card.base}>
         <View style={s.sectionTitleRow}>
           <Ionicons name="person-circle-outline" size={18} color={colors.blue} />
@@ -140,77 +174,21 @@ export default function Profile() {
           </View>
         </View>
       </View>
+      </FadeInView>
 
-      {/* ── Learning Progress ────────────────────────────────────────────── */}
+      {/* ── Learning Progress (PerformanceMatrix) ─────────────────────────── */}
+      <FadeInView delay={80}>
       <View style={card.base}>
         <View style={s.sectionTitleRow}>
           <Ionicons name="trending-up-outline" size={18} color={colors.green} />
           <Text style={s.sectionTitle}>Learning Progress</Text>
         </View>
-
-        <View style={s.progressCardsRow}>
-          <View style={[s.progressCard, { borderColor: colors.blueChip, backgroundColor: "#EEF5FF" }]}>
-            <View style={s.progressTop}>
-              <Text style={s.progressLabel}>Sessions Completed</Text>
-              <Text style={s.progressRight}>
-                {sessionsTotal > 0 ? `${sessionsCompleted}/${sessionsTotal}` : `${sessionsCompleted}`}
-              </Text>
-            </View>
-            <ProgressBar progress={sessionsProgress} />
-            <Text style={s.progressFoot}>{Math.round(sessionsProgress * 100)}% Complete</Text>
-          </View>
-
-          <View style={[s.progressCard, { borderColor: colors.purpleBorderAlt, backgroundColor: colors.purpleLighter }]}>
-            <View style={s.progressTop}>
-              <Text style={s.progressLabel}>Current Driving Score</Text>
-              <Text style={s.progressRight}>{currentDrivingScore > 0 ? `${currentDrivingScore}%` : "—"}</Text>
-            </View>
-            <ProgressBar progress={scoreProgress} />
-            {status !== "—" && (
-              <View style={s.smallPill}><Text style={s.smallPillText}>{status}</Text></View>
-            )}
-          </View>
-
-          <View style={[s.progressCard, { borderColor: colors.yellowBorderAlt, backgroundColor: colors.yellowLighter }]}>
-            <View style={s.progressTop}>
-              <Text style={s.progressLabel}>Badges Earned</Text>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <Ionicons name="trophy-outline" size={16} color={colors.yellow} />
-                <Text style={s.progressRight}>{badges.length}</Text>
-              </View>
-            </View>
-            {earnedBadgesChips.length > 0 && (
-              <View style={s.badgeChipsRow}>
-                {earnedBadgesChips.map((c) => (
-                  <View key={c} style={s.chip}><Text style={s.chipText}>{c}</Text></View>
-                ))}
-              </View>
-            )}
-            {badges.length === 0 && (
-              <Text style={s.progressFoot}>Complete sessions to earn badges</Text>
-            )}
-          </View>
-        </View>
-
-        <View style={divider.base} />
-
-        <Text style={s.subSectionTitle}>Your Badges</Text>
-        {badges.length === 0 ? (
-          <EmptyState text="No badges earned yet. Keep driving!" />
-        ) : (
-          <View style={s.badgeGrid}>
-            {badges.map((b) => (
-              <View key={b.id} style={s.badgeCard}>
-                <Text style={s.badgeEmoji}>{b.emoji}</Text>
-                <Text style={s.badgeTitle}>{b.title}</Text>
-                <View style={s.levelPill}><Text style={s.levelPillText}>{b.level}</Text></View>
-              </View>
-            ))}
-          </View>
-        )}
+        <PerformanceMatrix rows={progressRows} columns={2} />
       </View>
+      </FadeInView>
 
       {/* ── Instructor History ───────────────────────────────────────────── */}
+      <FadeInView delay={160}>
       <View style={card.base}>
         <View style={s.sectionTitleRow}>
           <Ionicons name="sparkles-outline" size={18} color={colors.purple} />
@@ -221,62 +199,93 @@ export default function Profile() {
           <EmptyState text="No instructor history yet." />
         ) : (
           <View style={{ gap: 14 }}>
-            {instructorHistory.map((inst) => (
-              <View key={inst.id} style={s.historyCard}>
-                <View style={s.historyTopRow}>
-                  <View style={s.historyAvatar}>
-                    <Text style={s.historyAvatarText}>{initials(inst.name)}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <View style={s.historyNameRow}>
-                      <Text style={s.historyName}>{inst.name}</Text>
-                      <Ionicons name="star" size={14} color={colors.yellow} />
-                      <Text style={s.historyRating}>{inst.rating.toFixed(1)}</Text>
+            {instructorHistory.map((inst) => {
+              const isExpanded = expandedNotes.has(inst.id);
+              const visibleNotes = isExpanded ? inst.notes : inst.notes.slice(0, 2);
+
+              return (
+                <View key={inst.id} style={s.historyCard}>
+                  <View style={s.historyTopRow}>
+                    <View style={s.historyAvatar}>
+                      <Text style={s.historyAvatarText}>{initials(inst.name)}</Text>
                     </View>
-                    <Text style={s.historySub}>{inst.sessionsCompleted} sessions completed</Text>
+                    <View style={{ flex: 1 }}>
+                      <View style={s.historyNameRow}>
+                        <Text style={s.historyName}>{inst.name}</Text>
+                        <Ionicons name="star" size={14} color={colors.yellow} />
+                        <Text style={s.historyRating}>{inst.rating.toFixed(1)}</Text>
+                      </View>
+                      <Text style={s.historySub}>{inst.sessionsCompleted} sessions completed</Text>
+                    </View>
                   </View>
+                  {visibleNotes.length > 0 && (
+                    <>
+                      <Text style={s.notesTitle}>Instructor Notes & Endorsements:</Text>
+                      <View style={{ gap: 10 }}>
+                        {visibleNotes.map((n, idx) => (
+                          <View key={idx} style={s.notePill}>
+                            <Ionicons name="checkmark-circle-outline" size={16} color={colors.blue} style={{ marginRight: 10 }} />
+                            <Text style={s.noteText}>{n}</Text>
+                          </View>
+                        ))}
+                      </View>
+                      {inst.notes.length > 2 && (
+                        <Pressable onPress={() => toggleNotes(inst.id)} style={{ marginTop: 6 }}>
+                          <Text style={s.showMoreText}>
+                            {isExpanded ? "Show less" : `Show ${inst.notes.length - 2} more`}
+                          </Text>
+                        </Pressable>
+                      )}
+                    </>
+                  )}
                 </View>
-                {inst.notes.length > 0 && (
-                  <>
-                    <Text style={s.notesTitle}>Instructor Notes & Endorsements:</Text>
-                    <View style={{ gap: 10 }}>
-                      {inst.notes.map((n, idx) => (
-                        <View key={idx} style={s.notePill}>
-                          <Ionicons name="checkmark-circle-outline" size={16} color={colors.blue} style={{ marginRight: 10 }} />
-                          <Text style={s.noteText}>{n}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  </>
-                )}
-              </View>
-            ))}
+              );
+            })}
           </View>
         )}
       </View>
+      </FadeInView>
 
-      {/* ── Milestones & Achievements ────────────────────────────────────── */}
+      {/* ── Milestones & Badges (merged) ──────────────────────────────────── */}
+      <FadeInView delay={240}>
       <View style={card.base}>
         <View style={s.sectionTitleRow}>
           <Ionicons name="medal-outline" size={18} color={colors.yellow} />
-          <Text style={s.sectionTitle}>Milestones & Achievements</Text>
+          <Text style={s.sectionTitle}>Milestones & Badges</Text>
         </View>
 
-        {milestones.length === 0 ? (
-          <EmptyState text="Complete sessions to start unlocking milestones." />
-        ) : (
+        {/* Badges */}
+        {badges.length > 0 && (
+          <>
+            <View style={s.badgeGrid}>
+              {badges.map((b) => (
+                <View key={b.id} style={s.badgeCard}>
+                  <Text style={s.badgeEmoji}>{b.emoji}</Text>
+                  <Text style={s.badgeTitle}>{b.title}</Text>
+                  <View style={s.levelPill}><Text style={s.levelPillText}>{b.level}</Text></View>
+                </View>
+              ))}
+            </View>
+            {milestones.length > 0 && <View style={divider.faint} />}
+          </>
+        )}
+
+        {/* Milestones */}
+        {milestones.length === 0 && badges.length === 0 ? (
+          <EmptyState text="Complete sessions to start unlocking milestones and badges." />
+        ) : milestones.length > 0 ? (
           <View style={s.milestoneGrid}>
             {milestones.map((m) => {
               const earned = m.status === "Earned";
               return (
                 <View key={m.id} style={[
                   s.milestoneCard,
-                  earned ? { backgroundColor: colors.yellowLight, borderColor: "#F6C66A" }
+                  earned ? { backgroundColor: colors.yellowLight, borderColor: tint.yellow.border }
                           : { backgroundColor: colors.pageBg, borderColor: colors.borderMid },
                 ]}>
                   <Text style={s.milestoneEmoji}>{m.emoji}</Text>
                   <Text style={s.milestoneTitle}>{m.title}</Text>
-                  <Text style={[s.milestoneDesc, !earned && { color: "#94A3B8" }]}>{m.desc}</Text>
+                  <Text style={[s.milestoneDesc, !earned && { color: colors.subtext }]}>{m.desc}</Text>
                   <View style={[s.earnedPill, earned ? null : s.lockedPill]}>
                     <Ionicons
                       name={earned ? "checkmark" : "lock-closed"} size={14} color="#FFFFFF" style={{ marginRight: 8 }}
@@ -290,7 +299,7 @@ export default function Profile() {
               );
             })}
           </View>
-        )}
+        ) : null}
 
         <View style={divider.base} />
 
@@ -302,6 +311,7 @@ export default function Profile() {
           </View>
         </View>
       </View>
+      </FadeInView>
 
       <View style={{ height: 6 }} />
     </ScrollView>
@@ -322,22 +332,6 @@ function InfoBlock({ label, value, icon }: { label: string; value: string; icon:
   );
 }
 
-function ProgressBar({ progress }: { progress: number }) {
-  return (
-    <View style={s.progressBarOuter}>
-      <View style={[s.progressBarInner, { width: `${Math.round(progress * 100)}%` as any }]} />
-    </View>
-  );
-}
-
-function EmptyState({ text }: { text: string }) {
-  return (
-    <View style={{ paddingVertical: 12, alignItems: "center" }}>
-      <Text style={{ fontSize: 12, fontWeight: "700", color: colors.subtext, textAlign: "center" }}>{text}</Text>
-    </View>
-  );
-}
-
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
@@ -354,64 +348,50 @@ const s = StyleSheet.create({
 
   personalRow:  { flexDirection: "row", gap: 14, alignItems: "center" },
   avatar:       { width: 88, height: 88, borderRadius: radius.pill, backgroundColor: colors.avatarPurple, alignItems: "center", justifyContent: "center" },
-  avatarText:   { color: "#FFFFFF", fontSize: 30, fontWeight: "900" },
+  avatarText:   { color: "#FFFFFF", fontSize: 30, fontFamily: fonts.extrabold },
   personalGrid: { flexDirection: "row", flexWrap: "wrap", gap: space.md },
   infoBlock:    { flexBasis: "48%", flexGrow: 1, minWidth: 150 },
   infoLabel:    { ...type_.labelSm },
   infoValueRow: { flexDirection: "row", alignItems: "center", marginTop: 6 },
-  infoValue:    { ...type_.body, fontWeight: "900" },
+  infoValue:    { ...type_.body, fontFamily: fonts.bold },
 
   statusPill:     { marginTop: 12, alignSelf: "flex-start", backgroundColor: colors.purpleChip, borderWidth: 1, borderColor: colors.blueChip, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 6 },
-  statusPillText: { color: colors.blue, fontWeight: "900", fontSize: 11 },
+  statusPillText: { color: colors.blue, fontSize: 11, fontFamily: fonts.extrabold },
 
-  progressCardsRow: { flexDirection: "row", flexWrap: "wrap", gap: space.md },
-  progressCard:     { flexGrow: 1, flexBasis: "32%", minWidth: 220, borderWidth: 1, borderRadius: radius.input, padding: space.md },
-  progressTop:      { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  progressLabel:    { ...type_.body, fontWeight: "900", color: colors.text },
-  progressRight:    { ...type_.body, fontWeight: "900", fontSize: 14, color: colors.text },
-  progressBarOuter: { marginTop: 10, height: 10, borderRadius: radius.pill, backgroundColor: "#CBD5E1", overflow: "hidden" },
-  progressBarInner: { height: "100%", backgroundColor: colors.darkBtn },
-  progressFoot:     { marginTop: 10, ...type_.labelSm },
-
-  smallPill:     { marginTop: 10, alignSelf: "flex-start", backgroundColor: colors.cardBg, borderWidth: 1, borderColor: colors.borderMid, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 5 },
-  smallPillText: { ...type_.chip },
-
-  badgeChipsRow: { marginTop: 10, flexDirection: "row", flexWrap: "wrap", gap: space.sm },
-  chip:          { backgroundColor: colors.cardBg, borderWidth: 1, borderColor: colors.borderMid, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 6 },
-  chipText:      { ...type_.chip },
-
-  subSectionTitle: { ...type_.sectionTitle, marginBottom: 10 },
-
+  // Badges
   badgeGrid: { flexDirection: "row", flexWrap: "wrap", gap: space.md },
-  badgeCard: { flexGrow: 1, flexBasis: "23%", minWidth: 160, borderWidth: 1, borderColor: "#F6C66A", backgroundColor: colors.yellowLight, borderRadius: radius.input, padding: 14, alignItems: "center", justifyContent: "center" },
+  badgeCard: { flexGrow: 1, flexBasis: "23%", minWidth: 160, borderWidth: 1, borderColor: tint.yellow.border, backgroundColor: colors.yellowLight, borderRadius: radius.input, padding: 14, alignItems: "center", justifyContent: "center" },
   badgeEmoji:{ fontSize: 24, marginBottom: 8 },
-  badgeTitle:{ ...type_.body, fontWeight: "900", textAlign: "center" },
+  badgeTitle:{ ...type_.body, textAlign: "center", fontFamily: fonts.bold },
   levelPill: { marginTop: 10, borderWidth: 1, borderColor: colors.borderMid, backgroundColor: colors.cardBg, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 6 },
   levelPillText: { ...type_.chip },
 
+  // Instructor History
   historyCard:      { borderWidth: 1, borderColor: colors.borderAlt, borderRadius: radius.input, padding: 14, backgroundColor: colors.cardBg },
   historyTopRow:    { flexDirection: "row", alignItems: "center", gap: space.md },
   historyAvatar:    { width: 54, height: 54, borderRadius: radius.pill, backgroundColor: colors.avatarPurple, alignItems: "center", justifyContent: "center" },
-  historyAvatarText:{ color: "#FFFFFF", fontWeight: "900", fontSize: 16 },
+  historyAvatarText:{ color: "#FFFFFF", fontSize: 16, fontFamily: fonts.extrabold },
   historyNameRow:   { flexDirection: "row", alignItems: "center", gap: 6 },
   historyName:      { ...type_.sectionTitle },
-  historyRating:    { ...type_.body, fontWeight: "900", color: colors.text },
+  historyRating:    { ...type_.body, color: colors.text, fontFamily: fonts.extrabold },
   historySub:       { marginTop: 6, ...type_.labelSm },
-  notesTitle:       { marginTop: 14, ...type_.body, fontWeight: "900", marginBottom: 8 },
+  notesTitle:       { marginTop: 14, ...type_.body, marginBottom: 8, fontFamily: fonts.extrabold },
   notePill:         { backgroundColor: colors.blueNote, borderWidth: 1, borderColor: colors.blueNoteBorder, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10, flexDirection: "row", alignItems: "center" },
-  noteText:         { color: colors.blue, fontWeight: "800", fontSize: 12, flex: 1 },
+  noteText:         { color: colors.blue, fontSize: 12, flex: 1, fontFamily: fonts.extrabold },
+  showMoreText:     { fontSize: 12, color: colors.blue, fontFamily: fonts.bold },
 
+  // Milestones
   milestoneGrid:  { flexDirection: "row", flexWrap: "wrap", gap: space.md },
   milestoneCard:  { flexGrow: 1, flexBasis: "31%", minWidth: 220, borderWidth: 1, borderRadius: radius.input, padding: 14, alignItems: "center" },
   milestoneEmoji: { fontSize: 26, marginBottom: 10 },
-  milestoneTitle: { ...type_.body, fontWeight: "900", textAlign: "center" },
+  milestoneTitle: { ...type_.body, textAlign: "center", fontFamily: fonts.bold },
   milestoneDesc:  { marginTop: 8, ...type_.body, textAlign: "center", lineHeight: 18 },
   earnedPill:     { marginTop: 12, backgroundColor: colors.darkBtn, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 8, flexDirection: "row", alignItems: "center" },
   lockedPill:     { backgroundColor: colors.borderMid },
-  earnedPillText: { color: "#FFFFFF", fontWeight: "900", fontSize: 11 },
+  earnedPillText: { color: "#FFFFFF", fontSize: 11, fontFamily: fonts.bold },
   milestoneDate:  { marginTop: 10, ...type_.labelSm },
 
-  motivationBanner: { backgroundColor: "#ECFDF3", borderWidth: 1, borderColor: colors.greenBorder, borderRadius: radius.input, padding: 14, flexDirection: "row", alignItems: "center", gap: space.md },
+  motivationBanner: { backgroundColor: tint.green.bg, borderWidth: 1, borderColor: colors.greenBorder, borderRadius: radius.input, padding: 14, flexDirection: "row", alignItems: "center", gap: space.md },
   motivationEmoji:  { fontSize: 22 },
   motivationTitle:  { ...type_.sectionTitle },
   motivationBody:   { marginTop: 6, ...type_.labelSm, lineHeight: 18 },

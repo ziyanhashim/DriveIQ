@@ -27,8 +27,8 @@ from pymongo import MongoClient
 import bcrypt
 from dotenv import load_dotenv
 
-# Load .env from the same directory as this script
-load_dotenv(Path(__file__).resolve().parent / ".env")
+# Load .env from the backend directory (one level up from scripts/)
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 # ── Config ──────────────────────────────────────────────────────────────────
 

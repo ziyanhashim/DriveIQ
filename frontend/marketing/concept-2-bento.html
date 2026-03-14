@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DriveIQ — Your AI-Powered Driving Coach</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    /* ========== CSS Custom Properties ========== */
+    :root {
+      --primary-blue: #2563EB;
+      --primary-blue-dark: #1D4ED8;
+      --accent-purple: #7C3AED;
+      --dark-purple: #6D28D9;
+      --deep-purple: #5B21B6;
+      --dark-bg: #0B1220;
+      --success-green: #16A34A;
+      --amber: #D97706;
+      --page-bg: #F8FAFC;
+      --card-bg: #FFFFFF;
+      --text-primary: #0F172A;
+      --text-muted: #64748B;
+      --border-color: #EAECF0;
+      --tint-blue: #EFF6FF;
+      --tint-purple: #F5F3FF;
+      --tint-green: #ECFDF3;
+      --tint-amber: #FEF9C3;
+      --footer-bg: #F1F5F9;
+      --font-sans: 'Sora', sans-serif;
+      --font-mono: 'Space Mono', monospace;
+      --max-width: 1200px;
+      --radius-card: 24px;
+      --radius-pill: 100px;
+    }
+
+    /* ========== Reset & Base ========== */
+    *, *::before, *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      font-size: 17px;
+      line-height: 1.7;
+      color: var(--text-primary);
+      background-color: var(--page-bg);
+    }
+
+    a {
+      text-decoration: none;
+      color: inherit;
+    }
+
+    ul {
+      list-style: none;
+    }
+
+    /* ========== Utility ========== */
+    .container {
+      width: 100%;
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    .section-label {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 400;
+      text-transform: uppercase;
+      letter-spacing: 4px;
+      color: var(--accent-purple);
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      font-family: var(--font-sans);
+      font-weight: 700;
+      font-size: 32px;
+      letter-spacing: -1px;
+      color: var(--text-primary);
+      line-height: 1.2;
+      margin-bottom: 48px;
+    }
+
+    /* ========== Buttons ========== */
+    .btn-dark {
+      display: inline-block;
+      font-family: var(--font-sans);
+      font-weight: 600;
+      font-size: 15px;
+      color: #FFFFFF;
+      background: var(--dark-bg);
+      border: none;
+      border-radius: var(--radius-pill);
+      padding: 14px 32px;
+      cursor: pointer;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .btn-dark:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(11, 18, 32, 0.3);
+    }
+
+    .btn-dark--large {
+      font-size: 18px;
+      padding: 18px 40px;
+    }
+
+    /* ========== Navigation ========== */
+    .nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .nav__inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 64px;
+    }
+
+    .nav__logo {
+      font-family: var(--font-sans);
+      font-weight: 800;
+      font-size: 20px;
+      color: var(--text-primary);
+    }
+
+    .nav__links {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+    }
+
+    .nav__link {
+      font-family: var(--font-sans);
+      font-weight: 600;
+      font-size: 15px;
+      color: var(--text-muted);
+      transition: color 0.2s ease;
+    }
+
+    .nav__link:hover {
+      color: var(--text-primary);
+    }
+
+    .nav__cta {
+      font-size: 14px;
+      padding: 10px 24px;
+    }
+
+    .nav__hamburger {
+      display: none;
+      flex-direction: column;
+      gap: 5px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+    }
+
+    .nav__hamburger span {
+      display: block;
+      width: 22px;
+      height: 2px;
+      background: var(--text-primary);
+      border-radius: 2px;
+      transition: transform 0.3s ease, opacity 0.3s ease;
+    }
+
+    .nav__mobile-menu {
+      display: none;
+      flex-direction: column;
+      gap: 16px;
+      padding: 24px;
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .nav__mobile-menu.active {
+      display: flex;
+    }
+
+    .nav__mobile-menu a {
+      font-family: var(--font-sans);
+      font-weight: 600;
+      font-size: 16px;
+      color: var(--text-muted);
+    }
+
+    /* ========== Hero ========== */
+    .hero {
+      background: var(--card-bg);
+      padding: 120px 24px 80px;
+      text-align: center;
+    }
+
+    .hero__inner {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .hero__overline {
+      font-family: var(--font-mono);
+      font-weight: 400;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 4px;
+      color: var(--accent-purple);
+      margin-bottom: 24px;
+    }
+
+    .hero__headline {
+      font-family: var(--font-sans);
+      font-weight: 800;
+      font-size: 64px;
+      letter-spacing: -3px;
+      line-height: 1.1;
+      color: var(--text-primary);
+      margin-bottom: 24px;
+    }
+
+    .hero__subtitle {
+      font-family: var(--font-sans);
+      font-weight: 400;
+      font-size: 20px;
+      color: var(--text-muted);
+      max-width: 600px;
+      margin: 0 auto 40px;
+      line-height: 1.6;
+    }
+
+    .hero__cta-wrap {
+      margin-bottom: 16px;
+    }
+
+    .hero__note {
+      font-family: var(--font-sans);
+      font-weight: 400;
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    /* ========== Bento Grid ========== */
+    .bento {
+      padding: 80px 0;
+    }
+
+    .bento__grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .bento-card {
+      border-radius: var(--radius-card);
+      padding: 36px;
+      overflow: hidden;
+      position: relative;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .bento-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1);
+    }
+
+    .bento-card__title {
+      font-family: var(--font-sans);
+      font-weight: 700;
+      font-size: 22px;
+      margin-bottom: 12px;
+      line-height: 1.3;
+    }
+
+    .bento-card__body {
+      font-family: var(--font-sans);
+      font-weight: 400;
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    /* Card A — Real-time Behavior Analysis */
+    .card-a {
+      grid-column: span 2;
+      background: linear-gradient(135deg, var(--accent-purple), var(--deep-purple));
+      color: #FFFFFF;
+      min-height: 320px;
+    }
+
+    .card-a .bento-card__title {
+      font-size: 24px;
+      color: #FFFFFF;
+    }
+
+    .card-a .bento-card__body {
+      color: rgba(255, 255, 255, 0.85);
+      max-width: 400px;
+    }
+
+    .score-ring {
+      position: absolute;
+      bottom: -16px;
+      right: 24px;
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: conic-gradient(#FFFFFF 0% 85%, rgba(255, 255, 255, 0.2) 85% 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .score-ring::before {
+      content: '';
+      position: absolute;
+      width: 88px;
+      height: 88px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent-purple), var(--deep-purple));
+    }
+
+    .score-ring__value {
+      position: relative;
+      z-index: 1;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 32px;
+      color: #FFFFFF;
+    }
+
+    /* Card B — Smart Alerts */
+    .card-b {
+      background: var(--tint-amber);
+      color: var(--text-primary);
+    }
+
+    .card-b__emoji {
+      font-size: 48px;
+      margin-bottom: 16px;
+      display: block;
+    }
+
+    .card-b .bento-card__title {
+      font-size: 20px;
+    }
+
+    .alert-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 20px;
+      padding: 8px 16px;
+      border: 1.5px solid var(--amber);
+      border-radius: var(--radius-pill);
+      font-family: var(--font-sans);
+      font-weight: 500;
+      font-size: 13px;
+      color: var(--amber);
+    }
+
+    .alert-pill__dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--amber);
+    }
+
+    /* Card C — Session Reports */
+    .card-c {
+      background: var(--tint-blue);
+      color: var(--text-primary);
+    }
+
+    .card-c__emoji {
+      font-size: 36px;
+      margin-bottom: 16px;
+      display: block;
+    }
+
+    .mini-chart {
+      margin-top: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .mini-chart__row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .mini-chart__label {
+      font-family: var(--font-sans);
+      font-weight: 500;
+      font-size: 12px;
+      color: var(--text-muted);
+      width: 56px;
+      flex-shrink: 0;
+    }
+
+    .mini-chart__bar-track {
+      flex: 1;
+      height: 8px;
+      background: rgba(0, 0, 0, 0.06);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .mini-chart__bar-fill {
+      height: 100%;
+      border-radius: 4px;
+    }
+
+    .mini-chart__bar-fill--green {
+      width: 72%;
+      background: var(--success-green);
+    }
+
+    .mini-chart__bar-fill--amber {
+      width: 18%;
+      background: var(--amber);
+    }
+
+    .mini-chart__bar-fill--red {
+      width: 10%;
+      background: #DC2626;
+    }
+
+    .mini-chart__value {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 12px;
+      color: var(--text-muted);
+      width: 32px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    /* Card D — How It Works */
+    .card-d {
+      grid-column: span 2;
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+    }
+
+    .steps-flow {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 28px;
+      gap: 0;
+    }
+
+    .step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      flex: 1;
+    }
+
+    .step__circle {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 16px;
+      color: #FFFFFF;
+      flex-shrink: 0;
+    }
+
+    .step__circle--blue { background: var(--primary-blue); }
+    .step__circle--purple { background: var(--accent-purple); }
+    .step__circle--amber { background: var(--amber); }
+    .step__circle--green { background: var(--success-green); }
+
+    .step__label {
+      font-family: var(--font-sans);
+      font-weight: 600;
+      font-size: 14px;
+      color: var(--text-primary);
+    }
+
+    .step-connector {
+      flex: 0.6;
+      border-top: 2px dashed var(--border-color);
+      align-self: flex-start;
+      margin-top: 26px;
+    }
+
+    /* Cards E, F, G — Stats */
+    .card-stat {
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      min-height: 200px;
+    }
+
+    .card-e {
+      background: radial-gradient(circle at center, #131d33, var(--dark-bg));
+      color: #FFFFFF;
+    }
+
+    .card-f {
+      background: radial-gradient(circle at center, #131d33, var(--dark-bg));
+      color: #FFFFFF;
+    }
+
+    .card-g {
+      background: linear-gradient(135deg, var(--primary-blue), var(--primary-blue-dark));
+      color: #FFFFFF;
+    }
+
+    .card-stat__number {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 64px;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    .card-stat__number--smaller {
+      font-size: 48px;
+    }
+
+    .card-stat__desc {
+      font-family: var(--font-sans);
+      font-weight: 400;
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    .card-g .card-stat__desc {
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    /* ========== Audience Section ========== */
+    .audience {
+      background: var(--card-bg);
+      padding: 80px 0;
+    }
+
+    .audience__grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+
+    .audience-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 32px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .audience-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1);
+    }
+
+    .audience-card__bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+    }
+
+    .audience-card__bar--blue { background: var(--primary-blue); }
+    .audience-card__bar--purple { background: var(--accent-purple); }
+    .audience-card__bar--green { background: var(--success-green); }
+
+    .audience-card__emoji {
+      font-size: 32px;
+      margin-bottom: 16px;
+      display: block;
+    }
+
+    .audience-card__title {
+      font-family: var(--font-sans);
+      font-weight: 700;
+      font-size: 20px;
+      margin-bottom: 20px;
+      color: var(--text-primary);
+    }
+
+    .audience-card__list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .audience-card__list li {
+      font-family: var(--font-sans);
+      font-weight: 400;
+      font-size: 15px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .audience-card__list li::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .audience-card--blue .audience-card__list li::before { background: var(--primary-blue); }
+    .audience-card--purple .audience-card__list li::before { background: var(--accent-purple); }
+    .audience-card--green .audience-card__list li::before { background: var(--success-green); }
+
+    .audience-card__link {
+      font-family: var(--font-sans);
+      font-weight: 600;
+      font-size: 15px;
+      transition: opacity 0.2s ease;
+    }
+
+    .audience-card__link:hover {
+      opacity: 0.75;
+    }
+
+    .audience-card__link--blue { color: var(--primary-blue); }
+    .audience-card__link--purple { color: var(--accent-purple); }
+    .audience-card__link--green { color: var(--success-green); }
+
+    /* ========== Testimonial ========== */
+    .testimonial {
+      padding: 80px 0;
+    }
+
+    .testimonial__card {
+      max-width: 800px;
+      margin: 0 auto;
+      text-align: center;
+      padding: 48px;
+    }
+
+    .testimonial__quote-mark {
+      font-family: var(--font-sans);
+      font-weight: 800;
+      font-size: 72px;
+      color: var(--border-color);
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    .testimonial__text {
+      font-family: var(--font-sans);
+      font-weight: 400;
+      font-style: italic;
+      font-size: 22px;
+      color: var(--text-primary);
+      line-height: 1.6;
+      margin-bottom: 32px;
+    }
+
+    .testimonial__name {
+      font-family: var(--font-sans);
+      font-weight: 700;
+      font-size: 16px;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .testimonial__role {
+      font-family: var(--font-sans);
+      font-weight: 400;
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    .testimonial__stars {
+      font-size: 20px;
+      color: var(--amber);
+      letter-spacing: 2px;
+    }
+
+    /* ========== Final CTA ========== */
+    .final-cta {
+      background: var(--card-bg);
+      padding: 100px 24px;
+      text-align: center;
+    }
+
+    .final-cta__inner {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .final-cta__title {
+      font-family: var(--font-sans);
+      font-weight: 700;
+      font-size: 36px;
+      color: var(--text-primary);
+      line-height: 1.25;
+      margin-bottom: 16px;
+    }
+
+    .final-cta__subtitle {
+      font-family: var(--font-sans);
+      font-weight: 400;
+      font-size: 17px;
+      color: var(--text-muted);
+      margin-bottom: 36px;
+    }
+
+    .final-cta__demo {
+      display: block;
+      margin-top: 16px;
+      font-family: var(--font-sans);
+      font-weight: 600;
+      font-size: 15px;
+      color: var(--text-muted);
+      transition: color 0.2s ease;
+    }
+
+    .final-cta__demo:hover {
+      color: var(--text-primary);
+    }
+
+    /* ========== Footer ========== */
+    .footer {
+      background: var(--footer-bg);
+      padding: 24px 0;
+    }
+
+    .footer__inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .footer__logo {
+      font-family: var(--font-sans);
+      font-weight: 800;
+      font-size: 16px;
+      color: var(--text-primary);
+    }
+
+    .footer__links {
+      display: flex;
+      gap: 24px;
+    }
+
+    .footer__link {
+      font-family: var(--font-sans);
+      font-weight: 400;
+      font-size: 14px;
+      color: var(--text-muted);
+      transition: color 0.2s ease;
+    }
+
+    .footer__link:hover {
+      color: var(--text-primary);
+    }
+
+    .footer__copy {
+      font-family: var(--font-sans);
+      font-weight: 400;
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    /* ========== Responsive — Tablet (768px) ========== */
+    @media (max-width: 1024px) {
+      .hero__headline {
+        font-size: 52px;
+      }
+
+      .bento__grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .card-a {
+        grid-column: span 2;
+      }
+
+      .card-b {
+        grid-column: span 1;
+      }
+
+      .card-c {
+        grid-column: span 1;
+      }
+
+      .card-d {
+        grid-column: span 2;
+      }
+
+      .card-e, .card-f, .card-g {
+        grid-column: span 1;
+      }
+
+      .card-g {
+        grid-column: span 2;
+      }
+
+      .audience__grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .audience__grid > :last-child {
+        grid-column: span 2;
+        max-width: 50%;
+        justify-self: center;
+      }
+    }
+
+    /* ========== Responsive — Mobile (768px) ========== */
+    @media (max-width: 768px) {
+      .hero {
+        padding: 80px 24px 60px;
+      }
+
+      .hero__headline {
+        font-size: 40px;
+        letter-spacing: -2px;
+      }
+
+      .hero__subtitle {
+        font-size: 17px;
+      }
+
+      .nav__links {
+        display: none;
+      }
+
+      .nav__hamburger {
+        display: flex;
+      }
+
+      .bento__grid {
+        grid-template-columns: 1fr;
+      }
+
+      .card-a,
+      .card-d,
+      .card-g {
+        grid-column: span 1;
+      }
+
+      .steps-flow {
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      .step-connector {
+        border-top: none;
+        border-left: 2px dashed var(--border-color);
+        height: 24px;
+        margin-top: 0;
+        align-self: center;
+      }
+
+      .score-ring {
+        bottom: -10px;
+        right: 16px;
+        width: 100px;
+        height: 100px;
+      }
+
+      .score-ring::before {
+        width: 72px;
+        height: 72px;
+      }
+
+      .score-ring__value {
+        font-size: 26px;
+      }
+
+      .card-stat__number {
+        font-size: 48px;
+      }
+
+      .card-stat__number--smaller {
+        font-size: 40px;
+      }
+
+      .audience__grid {
+        grid-template-columns: 1fr;
+      }
+
+      .audience__grid > :last-child {
+        grid-column: span 1;
+        max-width: 100%;
+      }
+
+      .testimonial__text {
+        font-size: 18px;
+      }
+
+      .testimonial__card {
+        padding: 24px;
+      }
+
+      .final-cta__title {
+        font-size: 28px;
+      }
+
+      .footer__inner {
+        flex-direction: column;
+        gap: 12px;
+        text-align: center;
+      }
+
+      .section-title {
+        font-size: 26px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ==================== Navigation ==================== -->
+  <nav class="nav">
+    <div class="container nav__inner">
+      <a href="#" class="nav__logo">DriveIQ</a>
+      <div class="nav__links">
+        <a href="#features" class="nav__link">Features</a>
+        <a href="#about" class="nav__link">About</a>
+        <a href="#contact" class="nav__link">Contact</a>
+        <a href="#" class="btn-dark nav__cta">Book a Demo</a>
+      </div>
+      <button class="nav__hamburger" onclick="toggleMobileMenu()" aria-label="Toggle menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+    <div class="nav__mobile-menu" id="mobileMenu">
+      <a href="#features">Features</a>
+      <a href="#about">About</a>
+      <a href="#contact">Contact</a>
+      <a href="#" class="btn-dark" style="text-align:center;">Book a Demo</a>
+    </div>
+  </nav>
+
+  <!-- ==================== Hero ==================== -->
+  <section class="hero">
+    <div class="hero__inner">
+      <p class="hero__overline">Driving Intelligence</p>
+      <h1 class="hero__headline">
+        Your AI-Powered<br>Driving Coach
+      </h1>
+      <p class="hero__subtitle">
+        Analyze driving behavior in real-time. Score performance with ML precision. Improve with every session.
+      </p>
+      <div class="hero__cta-wrap">
+        <a href="#" class="btn-dark btn-dark--large">Start Analyzing &rarr;</a>
+      </div>
+      <p class="hero__note">No credit card required &middot; Free for students</p>
+    </div>
+  </section>
+
+  <!-- ==================== Bento Feature Grid ==================== -->
+  <section class="bento" id="features">
+    <div class="container">
+      <p class="section-label">Platform</p>
+      <div class="bento__grid">
+
+        <!-- Card A: Real-time Behavior Analysis -->
+        <div class="bento-card card-a">
+          <h3 class="bento-card__title">Real-time Behavior Analysis</h3>
+          <p class="bento-card__body">
+            LSTM neural networks process 39 sensor features to classify driving behavior in real-time across 4-minute analysis windows.
+          </p>
+          <div class="score-ring">
+            <span class="score-ring__value">85</span>
+          </div>
+        </div>
+
+        <!-- Card B: Smart Alerts -->
+        <div class="bento-card card-b">
+          <span class="card-b__emoji">&#9889;</span>
+          <h3 class="bento-card__title">Smart Alerts</h3>
+          <p class="bento-card__body">
+            Instant notifications when risky patterns are detected. KNN anomaly scoring flags harsh driving, overspeeding, and tailgating.
+          </p>
+          <div class="alert-pill">
+            <span class="alert-pill__dot"></span>
+            4 alerts detected
+          </div>
+        </div>
+
+        <!-- Card C: Session Reports -->
+        <div class="bento-card card-c">
+          <span class="card-c__emoji">&#128202;</span>
+          <h3 class="bento-card__title">Session Reports</h3>
+          <p class="bento-card__body">
+            Detailed window-by-window analysis of every driving session with behavior breakdowns and scoring trends.
+          </p>
+          <div class="mini-chart">
+            <div class="mini-chart__row">
+              <span class="mini-chart__label">Normal</span>
+              <div class="mini-chart__bar-track">
+                <div class="mini-chart__bar-fill mini-chart__bar-fill--green"></div>
+              </div>
+              <span class="mini-chart__value">72%</span>
+            </div>
+            <div class="mini-chart__row">
+              <span class="mini-chart__label">Caution</span>
+              <div class="mini-chart__bar-track">
+                <div class="mini-chart__bar-fill mini-chart__bar-fill--amber"></div>
+              </div>
+              <span class="mini-chart__value">18%</span>
+            </div>
+            <div class="mini-chart__row">
+              <span class="mini-chart__label">Risky</span>
+              <div class="mini-chart__bar-track">
+                <div class="mini-chart__bar-fill mini-chart__bar-fill--red"></div>
+              </div>
+              <span class="mini-chart__value">10%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card D: How It Works -->
+        <div class="bento-card card-d">
+          <h3 class="bento-card__title">How It Works</h3>
+          <p class="bento-card__body">From raw sensor data to actionable improvement insights in four steps.</p>
+          <div class="steps-flow">
+            <div class="step">
+              <div class="step__circle step__circle--blue">01</div>
+              <span class="step__label">Capture</span>
+            </div>
+            <div class="step-connector"></div>
+            <div class="step">
+              <div class="step__circle step__circle--purple">02</div>
+              <span class="step__label">Analyze</span>
+            </div>
+            <div class="step-connector"></div>
+            <div class="step">
+              <div class="step__circle step__circle--amber">03</div>
+              <span class="step__label">Score</span>
+            </div>
+            <div class="step-connector"></div>
+            <div class="step">
+              <div class="step__circle step__circle--green">04</div>
+              <span class="step__label">Improve</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card E: Stat 39 -->
+        <div class="bento-card card-stat card-e">
+          <div>
+            <div class="card-stat__number">39</div>
+            <p class="card-stat__desc">Sensor features analyzed per session</p>
+          </div>
+        </div>
+
+        <!-- Card F: Stat 10 Hz -->
+        <div class="bento-card card-stat card-f">
+          <div>
+            <div class="card-stat__number card-stat__number--smaller">10 Hz</div>
+            <p class="card-stat__desc">Real-time data frequency</p>
+          </div>
+        </div>
+
+        <!-- Card G: Stat 4 min -->
+        <div class="bento-card card-stat card-g">
+          <div>
+            <div class="card-stat__number card-stat__number--smaller">4 min</div>
+            <p class="card-stat__desc">Analysis window duration</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== Audience Section ==================== -->
+  <section class="audience" id="about">
+    <div class="container">
+      <p class="section-label">For Everyone</p>
+      <h2 class="section-title">Built for the entire<br>driving ecosystem</h2>
+      <div class="audience__grid">
+
+        <!-- For Students -->
+        <div class="audience-card audience-card--blue">
+          <div class="audience-card__bar audience-card__bar--blue"></div>
+          <span class="audience-card__emoji">&#127891;</span>
+          <h3 class="audience-card__title">For Students</h3>
+          <ul class="audience-card__list">
+            <li>Track your score</li>
+            <li>Get AI feedback</li>
+            <li>Review sessions</li>
+            <li>Earn badges</li>
+          </ul>
+          <a href="#" class="audience-card__link audience-card__link--blue">Start learning &rarr;</a>
+        </div>
+
+        <!-- For Instructors -->
+        <div class="audience-card audience-card--purple">
+          <div class="audience-card__bar audience-card__bar--purple"></div>
+          <span class="audience-card__emoji">&#128104;&#8205;&#127979;</span>
+          <h3 class="audience-card__title">For Instructors</h3>
+          <ul class="audience-card__list">
+            <li>Monitor progress</li>
+            <li>Manage bookings</li>
+            <li>Add session notes</li>
+            <li>View analytics</li>
+          </ul>
+          <a href="#" class="audience-card__link audience-card__link--purple">Start teaching &rarr;</a>
+        </div>
+
+        <!-- For Schools -->
+        <div class="audience-card audience-card--green">
+          <div class="audience-card__bar audience-card__bar--green"></div>
+          <span class="audience-card__emoji">&#127979;</span>
+          <h3 class="audience-card__title">For Schools</h3>
+          <ul class="audience-card__list">
+            <li>Fleet analytics</li>
+            <li>Quality standards</li>
+            <li>Student tracking</li>
+            <li>Data insights</li>
+          </ul>
+          <a href="#" class="audience-card__link audience-card__link--green">Contact sales &rarr;</a>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== Testimonial ==================== -->
+  <section class="testimonial">
+    <div class="container">
+      <div class="testimonial__card">
+        <div class="testimonial__quote-mark">&ldquo;</div>
+        <p class="testimonial__text">
+          DriveIQ transformed how I teach. I can now pinpoint exactly where my students need improvement, backed by real data instead of gut feeling.
+        </p>
+        <p class="testimonial__name">Sarah Mitchell</p>
+        <p class="testimonial__role">Certified Driving Instructor</p>
+        <div class="testimonial__stars">&#9733;&#9733;&#9733;&#9733;&#9733;</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== Final CTA ==================== -->
+  <section class="final-cta" id="contact">
+    <div class="final-cta__inner">
+      <h2 class="final-cta__title">Start your journey to<br>safer driving today</h2>
+      <p class="final-cta__subtitle">Join hundreds of students and instructors already using DriveIQ</p>
+      <a href="#" class="btn-dark btn-dark--large">Get Started Free</a>
+      <a href="#" class="final-cta__demo">Book a Demo</a>
+    </div>
+  </section>
+
+  <!-- ==================== Footer ==================== -->
+  <footer class="footer">
+    <div class="container footer__inner">
+      <span class="footer__logo">DriveIQ</span>
+      <div class="footer__links">
+        <a href="#" class="footer__link">Privacy</a>
+        <a href="#" class="footer__link">Terms</a>
+        <a href="#" class="footer__link">Contact</a>
+      </div>
+      <span class="footer__copy">&copy; 2025 DriveIQ</span>
+    </div>
+  </footer>
+
+  <!-- ==================== Mobile Menu Script ==================== -->
+  <script>
+    function toggleMobileMenu() {
+      var menu = document.getElementById('mobileMenu');
+      menu.classList.toggle('active');
+    }
+
+    // Close mobile menu when a link is clicked
+    document.querySelectorAll('.nav__mobile-menu a').forEach(function(link) {
+      link.addEventListener('click', function() {
+        document.getElementById('mobileMenu').classList.remove('active');
+      });
+    });
+  </script>
+
+</body>
+</html>
