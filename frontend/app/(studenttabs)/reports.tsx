@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -11,14 +11,13 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { apiGet } from "../../lib/api";
-import {
-  colors,
-  card,
-  page,
-  space,
-  shadow,
-  radius,
-} from "../../lib/theme";
+import { colors, fonts, page, space } from "../../lib/theme";
+import FadeInView from "../../components/FadeInView";
+import AnimatedPressable from "../../components/AnimatedPressable";
+import MetricCard from "../../components/MetricCard";
+import SessionCard from "../../components/SessionCard";
+import EmptyState from "../../components/EmptyState";
+import FilterChips from "../../components/FilterChips";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -39,152 +38,7 @@ type SessionSummary = {
   report_ready?: boolean;
 };
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-function getScoreColor(score: number) {
-  if (score >= 80) return colors.green;
-  if (score >= 60) return colors.yellow;
-  return colors.red;
-}
-
-function getScoreBg(score: number) {
-  if (score >= 80) return colors.greenLight;
-  if (score >= 60) return "#FEF9C3";
-  return colors.redLight;
-}
-
-// ─── Mini Behavior Dots ─────────────────────────────────────────────────────
-
-function MiniTimeline({
-  summary,
-}: {
-  summary: SessionSummary["window_summary"];
-}) {
-  const total = summary.total || 30;
-  const dots = [];
-  let idx = 0;
-
-  // Build a simplified visual: normal dots first, then drowsy, then aggressive
-  // In practice you'd use the actual window order — this is just for the list preview
-  for (let i = 0; i < summary.normal && idx < total; i++, idx++)
-    dots.push("normal");
-  for (let i = 0; i < summary.drowsy && idx < total; i++, idx++)
-    dots.push("drowsy");
-  for (let i = 0; i < summary.aggressive && idx < total; i++, idx++)
-    dots.push("aggressive");
-
-  const DOT_COLORS = {
-    normal: colors.green,
-    drowsy: colors.yellow,
-    aggressive: colors.red,
-  };
-
-  return (
-    <View style={ls.miniTimeline}>
-      {dots.slice(0, 30).map((type, i) => (
-        <View
-          key={i}
-          style={[
-            ls.miniDot,
-            { backgroundColor: DOT_COLORS[type as keyof typeof DOT_COLORS] },
-          ]}
-        />
-      ))}
-    </View>
-  );
-}
-
-// ─── Session Card ───────────────────────────────────────────────────────────
-
-function SessionCard({
-  session,
-  onPress,
-}: {
-  session: SessionSummary;
-  onPress: () => void;
-}) {
-  const scoreColor = getScoreColor(session.performance_score);
-  const ws = session.window_summary;
-  const flagged = ws.aggressive + ws.drowsy;
-
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        card.base,
-        ls.sessionCard,
-        pressed && { opacity: 0.92, transform: [{ scale: 0.985 }] },
-      ]}
-    >
-      {/* Top row: date + score */}
-      <View style={ls.cardTopRow}>
-        <View style={{ flex: 1 }}>
-          <Text style={ls.cardDate}>{session.date}</Text>
-          <View style={ls.cardMetaRow}>
-            <View style={ls.cardMetaItem}>
-              <Ionicons name="car-outline" size={13} color={colors.subtext} />
-              <Text style={ls.cardMetaText}>{session.road_type}</Text>
-            </View>
-            <View style={ls.cardMetaItem}>
-              <Ionicons name="time-outline" size={13} color={colors.subtext} />
-              <Text style={ls.cardMetaText}>{session.duration_minutes} min</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Score badge */}
-        <View style={[ls.scoreBadge, { backgroundColor: getScoreBg(session.performance_score) }]}>
-          <Text style={[ls.scoreBadgeText, { color: scoreColor }]}>
-            {session.performance_score}
-          </Text>
-          <Text style={[ls.scoreBadgeUnit, { color: scoreColor }]}>/100</Text>
-        </View>
-      </View>
-
-      {/* Mini timeline preview */}
-      <MiniTimeline summary={ws} />
-
-      {/* Bottom: status + flagged count */}
-      <View style={ls.cardBottomRow}>
-        <View style={ls.statusRow}>
-          <View
-            style={[
-              ls.statusBadge,
-              {
-                backgroundColor: session.passed ? colors.greenLight : colors.redLight,
-              },
-            ]}
-          >
-            <Ionicons
-              name={session.passed ? "checkmark-circle" : "close-circle"}
-              size={14}
-              color={session.passed ? colors.green : colors.red}
-            />
-            <Text
-              style={[
-                ls.statusText,
-                { color: session.passed ? colors.greenDark ?? "#166534" : colors.redDark },
-              ]}
-            >
-              {session.passed ? "Passed" : "Needs Improvement"}
-            </Text>
-          </View>
-
-          {flagged > 0 && (
-            <View style={ls.flaggedBadge}>
-              <Ionicons name="warning-outline" size={12} color="#92400E" />
-              <Text style={ls.flaggedText}>
-                {flagged} flagged window{flagged > 1 ? "s" : ""}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        <Ionicons name="chevron-forward" size={18} color={colors.muted} />
-      </View>
-    </Pressable>
-  );
-}
+const PAGE_SIZE = 10;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
@@ -195,6 +49,9 @@ export default function ReportsListScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [roadFilter, setRoadFilter] = useState("All");
+  const [sortBy, setSortBy] = useState<"date" | "score">("date");
 
   async function loadSessions() {
     try {
@@ -209,23 +66,46 @@ export default function ReportsListScreen() {
     }
   }
 
-  useEffect(() => {
-    loadSessions();
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      loadSessions();
-    }, [])
-  );
+  useEffect(() => { loadSessions(); }, []);
+  useFocusEffect(useCallback(() => { loadSessions(); }, []));
 
   function onRefresh() {
     setRefreshing(true);
     loadSessions();
   }
 
-  // ── Loading ────────────────────────────────────────────────────────────
+  // ── Computed stats ──────────────────────────────────────────────────────
+  const avgScore = useMemo(() => {
+    if (sessions.length === 0) return 0;
+    return Math.round(sessions.reduce((sum, s) => sum + s.performance_score, 0) / sessions.length);
+  }, [sessions]);
 
+  const passRate = useMemo(() => {
+    if (sessions.length === 0) return 0;
+    return Math.round((sessions.filter((s) => s.passed).length / sessions.length) * 100);
+  }, [sessions]);
+
+  // ── Filter + sort options ──────────────────────────────────────────────
+  const roadTypes = useMemo(() => {
+    const types = new Set(sessions.map((s) => s.road_type).filter(Boolean));
+    return ["All", ...Array.from(types)];
+  }, [sessions]);
+
+  const filtered = useMemo(() => {
+    let list = sessions;
+    if (roadFilter !== "All") {
+      list = list.filter((s) => s.road_type === roadFilter);
+    }
+    if (sortBy === "score") {
+      list = [...list].sort((a, b) => b.performance_score - a.performance_score);
+    }
+    return list;
+  }, [sessions, roadFilter, sortBy]);
+
+  const visible = filtered.slice(0, visibleCount);
+  const hasMore = visibleCount < filtered.length;
+
+  // ── Loading ────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <View style={page.center}>
@@ -236,7 +116,6 @@ export default function ReportsListScreen() {
   }
 
   // ── Error ──────────────────────────────────────────────────────────────
-
   if (error) {
     return (
       <View style={page.center}>
@@ -250,43 +129,74 @@ export default function ReportsListScreen() {
   }
 
   // ── Render ─────────────────────────────────────────────────────────────
-
   return (
     <View style={page.base}>
       <ScrollView
         contentContainerStyle={[page.content, { paddingTop: 16 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.purpleDark}
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.purpleDark} />
         }
       >
         {/* Header */}
+        <FadeInView delay={0}>
         <View style={ls.header}>
           <Text style={ls.headerTitle}>My Reports</Text>
           <Text style={ls.headerSub}>
             {sessions.length} session{sessions.length !== 1 ? "s" : ""} completed
           </Text>
         </View>
+        </FadeInView>
 
-        {/* Session List */}
-        {sessions.length === 0 ? (
-          <View style={[card.base, ls.emptyCard]}>
-            <Ionicons name="document-text-outline" size={44} color={colors.muted} />
-            <Text style={ls.emptyTitle}>No reports yet</Text>
-            <Text style={ls.emptyText}>
-              Your driving session reports will appear here after your instructor processes them.
-            </Text>
+        {/* Summary Stats */}
+        {sessions.length > 0 && (
+          <FadeInView delay={80}>
+          <View style={ls.statsRow}>
+            <MetricCard label="Total Sessions" value={sessions.length} icon="📊" tintKey="blue" />
+            <MetricCard label="Avg Score" value={`${avgScore}%`} icon="🎯" tintKey={avgScore >= 80 ? "green" : avgScore >= 60 ? "yellow" : "red"} />
+            <MetricCard label="Pass Rate" value={`${passRate}%`} icon="✅" tintKey="green" subtitle={`${sessions.filter((s) => s.passed).length} passed`} />
           </View>
+          </FadeInView>
+        )}
+
+        {/* Filter / Sort Bar */}
+        {sessions.length > 0 && (
+          <FadeInView delay={120}>
+          <View style={ls.filterRow}>
+            <FilterChips options={roadTypes} value={roadFilter} onChange={setRoadFilter} />
+            <AnimatedPressable
+              onPress={() => setSortBy(sortBy === "date" ? "score" : "date")}
+              style={ls.sortBtn}
+            >
+              <Ionicons name={sortBy === "date" ? "calendar-outline" : "trending-up-outline"} size={14} color={colors.subtext} />
+              <Text style={ls.sortBtnText}>
+                {sortBy === "date" ? "By Date" : "By Score"}
+              </Text>
+            </AnimatedPressable>
+          </View>
+          </FadeInView>
+        )}
+
+        {/* Session Cards */}
+        {filtered.length === 0 ? (
+          <EmptyState
+            title="No reports yet"
+            text="Your driving session reports will appear here after your instructor processes them."
+          />
         ) : (
-          <View style={{ gap: 12 }}>
-            {sessions.map((session) => (
+          <View style={{ gap: 14 }}>
+            {visible.map((session) => (
               <SessionCard
                 key={session.session_id}
-                session={session}
+                sessionId={session.session_id}
+                date={session.date}
+                roadType={session.road_type}
+                performanceScore={session.performance_score}
+                passed={session.passed}
+                durationMinutes={session.duration_minutes}
+                windowSummary={session.window_summary}
+                reportReady={session.report_ready}
+                variant="full"
                 onPress={() =>
                   router.push({
                     pathname: "/(studenttabs)/session-report",
@@ -295,6 +205,18 @@ export default function ReportsListScreen() {
                 }
               />
             ))}
+
+            {/* Load More */}
+            {hasMore && (
+              <AnimatedPressable
+                onPress={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                style={ls.loadMoreBtn}
+              >
+                <Text style={ls.loadMoreText}>
+                  Load More ({filtered.length - visibleCount} remaining)
+                </Text>
+              </AnimatedPressable>
+            )}
           </View>
         )}
 
@@ -309,160 +231,61 @@ export default function ReportsListScreen() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const ls = StyleSheet.create({
-  // ── Header
   header: {
     marginBottom: 8,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: "800",
+    fontSize: 22,
     color: colors.text,
     letterSpacing: -0.5,
+    fontFamily: fonts.extrabold,
   },
   headerSub: {
     fontSize: 14,
-    fontWeight: "500",
     color: colors.subtext,
     marginTop: 4,
+    fontFamily: fonts.regular,
   },
-
-  // ── Session Card
-  sessionCard: {
-    gap: 12,
-  },
-  cardTopRow: {
+  statsRow: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-  },
-  cardDate: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: colors.text,
-    marginBottom: 4,
-  },
-  cardMetaRow: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  cardMetaItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  cardMetaText: {
-    fontSize: 12,
-    fontWeight: "500",
-    color: colors.subtext,
-  },
-
-  // ── Score badge
-  scoreBadge: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-  },
-  scoreBadgeText: {
-    fontSize: 22,
-    fontWeight: "900",
-    letterSpacing: -0.5,
-  },
-  scoreBadgeUnit: {
-    fontSize: 12,
-    fontWeight: "600",
-    marginLeft: 1,
-  },
-
-  // ── Mini timeline
-  miniTimeline: {
-    flexDirection: "row",
-    gap: 3,
     flexWrap: "wrap",
+    gap: 12,
   },
-  miniDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 2,
-  },
-
-  // ── Bottom row
-  cardBottomRow: {
+  filterRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-  },
-  statusRow: {
-    flexDirection: "row",
-    alignItems: "center",
     gap: 8,
   },
-  statusBadge: {
+  sortBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  flaggedBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: "#FEF9C3",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  flaggedText: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: "#92400E",
-  },
-
-  // ── Pending badge
-  pendingBadge: {
-    flexDirection: "row",
-    alignItems: "center",
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 12,
-    backgroundColor: "#F3F4F6",
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: colors.border,
+    backgroundColor: colors.cardBg,
   },
-  pendingBadgeText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#6B7280",
-  },
-
-  // ── Empty
-  emptyCard: {
-    alignItems: "center",
-    paddingVertical: 40,
-    gap: 8,
-  },
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.text,
-  },
-  emptyText: {
-    fontSize: 13,
-    fontWeight: "500",
+  sortBtnText: {
+    fontSize: 12,
     color: colors.subtext,
-    textAlign: "center",
-    paddingHorizontal: 24,
-    lineHeight: 19,
+    fontFamily: fonts.semibold,
   },
-
-  // ── Retry
+  loadMoreBtn: {
+    alignItems: "center",
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.cardBg,
+  },
+  loadMoreText: {
+    fontSize: 13,
+    color: colors.blue,
+    fontFamily: fonts.semibold,
+  },
   retryBtn: {
     marginTop: 16,
     paddingHorizontal: 24,
@@ -472,7 +295,7 @@ const ls = StyleSheet.create({
   },
   retryBtnText: {
     fontSize: 14,
-    fontWeight: "700",
     color: "#FFFFFF",
+    fontFamily: fonts.bold,
   },
 });

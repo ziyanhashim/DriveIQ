@@ -24,7 +24,17 @@ import {
   page,
   shadow,
   divider,
+  tint,
+  fonts,
 } from "../../lib/theme";
+
+// Shared components
+import SectionHeader from "../../components/SectionHeader";
+import ScoreRing from "../../components/ScoreRing";
+import BehaviorBar from "../../components/BehaviorBar";
+import FilterChips, { ChipOption } from "../../components/FilterChips";
+import MetricCard from "../../components/MetricCard";
+import RecommendationQueue, { Recommendation } from "../../components/RecommendationQueue";
 
 // ─── Enable LayoutAnimation on Android ──────────────────────────────────────
 
@@ -50,7 +60,7 @@ type WindowData = {
   severity: number;
   knn_distance: number;
   trigger_features: TriggerFeature[];
-  feedback?: string; // LLM-generated feedback
+  feedback?: string;
   start_time?: string;
   end_time?: string;
   is_flagged?: boolean;
@@ -73,9 +83,12 @@ type SessionReport = {
   instructor?: string;
   instructor_notes?: string;
   report_ready?: boolean;
+  ai_feedback?: { priority: string; title: string; message: string; icon: string }[];
 };
 
-type FilterMode = "all" | "abnormal" | "aggressive" | "drowsy" | "normal";
+type FilterMode = "All" | "Abnormal" | "Aggressive" | "Drowsy" | "Normal";
+
+const WINDOWS_PER_PAGE = 20;
 
 // ─── Color Helpers ──────────────────────────────────────────────────────────
 
@@ -95,10 +108,10 @@ const LABEL_COLORS = {
     icon: "warning" as const,
   },
   Drowsy: {
-    bg: "#FEF9C3",
-    border: colors.yellowBorder,
-    text: "#92400E",
-    dot: colors.yellow,
+    bg: colors.amberBg,
+    border: colors.amberBorder,
+    text: colors.amberDark,
+    dot: colors.amber,
     icon: "moon" as const,
   },
 };
@@ -123,77 +136,8 @@ function severityLabel(s: number): string {
 function severityColor(s: number): string {
   if (s <= 2) return colors.green;
   if (s <= 5) return colors.yellow;
-  if (s <= 7) return "#F97316"; // orange
+  if (s <= 7) return colors.orange;
   return colors.red;
-}
-
-// ─── Section Header (reusable) ──────────────────────────────────────────────
-
-function SectionHeader({
-  icon,
-  iconBg,
-  label,
-  right,
-}: {
-  icon: string;
-  iconBg: string;
-  label: string;
-  right?: React.ReactNode;
-}) {
-  return (
-    <View style={s.sectionHeaderRow}>
-      <View style={s.sectionHeaderLeft}>
-        <View style={[s.sectionIcon, { backgroundColor: iconBg }]}>
-          <Text style={{ fontSize: 14 }}>{icon}</Text>
-        </View>
-        <Text style={s.sectionTitle}>{label}</Text>
-      </View>
-      {right}
-    </View>
-  );
-}
-
-// ─── Score Ring ─────────────────────────────────────────────────────────────
-
-function ScoreRing({ score, size = 100 }: { score: number; size?: number }) {
-  const strokeWidth = 8;
-  const r = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * r;
-  const progress = (score / 100) * circumference;
-  const color = getScoreColor(score);
-
-  return (
-    <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
-      {/* Background ring */}
-      <View
-        style={{
-          position: "absolute",
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          borderWidth: strokeWidth,
-          borderColor: colors.borderLight,
-        }}
-      />
-      {/* Progress ring (approximated with border) */}
-      <View
-        style={{
-          position: "absolute",
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          borderWidth: strokeWidth,
-          borderColor: color,
-          borderRightColor: "transparent",
-          borderBottomColor: score > 50 ? color : "transparent",
-          borderLeftColor: score > 75 ? color : "transparent",
-          transform: [{ rotate: "-45deg" }],
-        }}
-      />
-      <Text style={[s.scoreValue, { color }]}>{score}</Text>
-      <Text style={s.scoreLabel}>/ 100</Text>
-    </View>
-  );
 }
 
 // ─── Window Block (in the timeline grid) ────────────────────────────────────
@@ -202,7 +146,6 @@ function WindowBlock({
   window: w,
   isSelected,
   onPress,
-  index,
 }: {
   window: WindowData;
   isSelected: boolean;
@@ -213,19 +156,10 @@ function WindowBlock({
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   const handlePressIn = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 0.92,
-      useNativeDriver: true,
-      speed: 50,
-    }).start();
+    Animated.spring(scaleAnim, { toValue: 0.92, useNativeDriver: true, speed: 50 }).start();
   };
-
   const handlePressOut = () => {
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      useNativeDriver: true,
-      speed: 50,
-    }).start();
+    Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true, speed: 50 }).start();
   };
 
   return (
@@ -241,8 +175,8 @@ function WindowBlock({
             borderColor: labelStyle.dot,
             borderWidth: 2.5,
             ...(Platform.OS === "ios"
-            ? { shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4 }
-            : { elevation: 2 }),
+              ? { shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4 }
+              : { elevation: 2 }),
           },
         ]}
       >
@@ -252,42 +186,6 @@ function WindowBlock({
         </Text>
       </Pressable>
     </Animated.View>
-  );
-}
-
-// ─── Filter Chip ────────────────────────────────────────────────────────────
-
-function FilterChip({
-  label,
-  count,
-  active,
-  color: chipColor,
-  onPress,
-}: {
-  label: string;
-  count: number;
-  active: boolean;
-  color: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[
-        s.filterChip,
-        active && { backgroundColor: chipColor, borderColor: chipColor },
-      ]}
-    >
-      {!active && <View style={[s.chipDot, { backgroundColor: chipColor }]} />}
-      <Text
-        style={[
-          s.filterChipText,
-          active && { color: "#FFFFFF", fontWeight: "700" },
-        ]}
-      >
-        {label} ({count})
-      </Text>
-    </Pressable>
   );
 }
 
@@ -305,18 +203,10 @@ function FeedbackPanel({ window: w }: { window: WindowData }) {
       {/* Header */}
       <View style={s.feedbackHeader}>
         <View style={s.feedbackHeaderLeft}>
-          <Ionicons
-            name={labelStyle.icon}
-            size={20}
-            color={labelStyle.dot}
-          />
+          <Ionicons name={labelStyle.icon} size={20} color={labelStyle.dot} />
           <View>
-            <Text style={s.feedbackTitle}>
-              Window {w.window_id + 1} — {w.predicted_label}
-            </Text>
-            <Text style={s.feedbackTime}>
-              {timeStr} → {endStr}
-            </Text>
+            <Text style={s.feedbackTitle}>Window {w.window_id + 1} — {w.predicted_label}</Text>
+            <Text style={s.feedbackTime}>{timeStr} → {endStr}</Text>
           </View>
         </View>
         <View style={[s.severityBadge, { backgroundColor: severityColor(w.severity) + "18" }]}>
@@ -331,7 +221,7 @@ function FeedbackPanel({ window: w }: { window: WindowData }) {
         <View style={s.alertCauseRow}>
           <Ionicons name="alert-circle" size={16} color={colors.yellow} />
           <Text style={s.alertCauseText}>
-            Alert: <Text style={{ fontWeight: "700" }}>{w.alert_cause}</Text>
+            Alert: <Text style={{ fontFamily: fonts.bold }}>{w.alert_cause}</Text>
           </Text>
         </View>
       )}
@@ -374,54 +264,6 @@ function FeedbackPanel({ window: w }: { window: WindowData }) {
   );
 }
 
-// ─── Behavior Breakdown Bar ─────────────────────────────────────────────────
-
-function BehaviorBar({
-  normal,
-  aggressive,
-  drowsy,
-  total,
-}: {
-  normal: number;
-  aggressive: number;
-  drowsy: number;
-  total: number;
-}) {
-  const nPct = (normal / total) * 100;
-  const aPct = (aggressive / total) * 100;
-  const dPct = (drowsy / total) * 100;
-
-  return (
-    <View>
-      <View style={s.behaviorBarTrack}>
-        {nPct > 0 && (
-          <View style={[s.behaviorBarSeg, { flex: nPct, backgroundColor: colors.green, borderTopLeftRadius: 6, borderBottomLeftRadius: 6 }]} />
-        )}
-        {dPct > 0 && (
-          <View style={[s.behaviorBarSeg, { flex: dPct, backgroundColor: colors.yellow }]} />
-        )}
-        {aPct > 0 && (
-          <View style={[s.behaviorBarSeg, { flex: aPct, backgroundColor: colors.red, borderTopRightRadius: 6, borderBottomRightRadius: 6 }]} />
-        )}
-      </View>
-      <View style={s.behaviorLegend}>
-        <View style={s.legendItem}>
-          <View style={[s.legendDot, { backgroundColor: colors.green }]} />
-          <Text style={s.legendText}>Normal {normal}</Text>
-        </View>
-        <View style={s.legendItem}>
-          <View style={[s.legendDot, { backgroundColor: colors.yellow }]} />
-          <Text style={s.legendText}>Drowsy {drowsy}</Text>
-        </View>
-        <View style={s.legendItem}>
-          <View style={[s.legendDot, { backgroundColor: colors.red }]} />
-          <Text style={s.legendText}>Aggressive {aggressive}</Text>
-        </View>
-      </View>
-    </View>
-  );
-}
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -434,61 +276,48 @@ export default function SessionReportScreen() {
   const [loading, setLoading] = useState(true);
   const [report, setReport] = useState<SessionReport | null>(null);
   const [error, setError] = useState<string | null>(null);
-
   const [selectedWindow, setSelectedWindow] = useState<number | null>(null);
-  const [filter, setFilter] = useState<FilterMode>("all");
+  const [filter, setFilter] = useState<FilterMode>("All");
+  const [timelinePage, setTimelinePage] = useState(0);
+  const [notesExpanded, setNotesExpanded] = useState(false);
 
-  // polling ref — cleared when report becomes ready
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
 
   // ── Fetch report data ──────────────────────────────────────────────────
 
-  useEffect(() => {
-    loadReport();
-  }, [sessionId]);
+  useEffect(() => { loadReport(); }, [sessionId]);
 
   async function loadReport(silent = false) {
     try {
-      if (!silent) {
-        setLoading(true);
-        setError(null);
-      }
+      if (!silent) { setLoading(true); setError(null); }
 
-      // Fetch both timeline and report endpoints
       const [timelineData, reportData] = await Promise.all([
         apiGet(`/sessions/${sessionId}/timeline`),
         apiGet(`/sessions/${sessionId}/report`),
       ]);
 
-      // const reportReady: boolean = reportData.report_ready ?? false;
-      const reportReady: boolean = true; // TODO: re-enable when report_ready logic is finalized
+      const reportReady: boolean = true;
 
-      // Merge into a single report object
       const merged: SessionReport = {
         session_id: sessionId ?? "",
         road_type: timelineData.road_type,
         performance_score: reportData.overall_score?.score ?? 0,
         total_windows: timelineData.total_windows,
         window_summary: reportData.window_summary ?? {
-          total: timelineData.total_windows,
-          normal: 0,
-          drowsy: 0,
-          aggressive: 0,
+          total: timelineData.total_windows, normal: 0, drowsy: 0, aggressive: 0,
         },
         windows: timelineData.windows ?? [],
         date: reportData.session_summary?.date,
         instructor: reportData.session_summary?.instructor,
         instructor_notes: reportData.instructor_notes ?? "",
         report_ready: reportReady,
+        ai_feedback: reportData.ai_feedback,
       };
 
-      // Calculate window_summary from windows if not provided
       if (!reportData.window_summary) {
         const ws = { total: merged.windows.length, normal: 0, drowsy: 0, aggressive: 0 };
         merged.windows.forEach((w) => {
@@ -502,22 +331,15 @@ export default function SessionReportScreen() {
 
       setReport(merged);
 
-      // Auto-select first abnormal window if any
       if (reportReady) {
         const firstAbnormal = merged.windows.find((w) => w.predicted_label !== "Normal");
         if (firstAbnormal) setSelectedWindow(firstAbnormal.window_id);
       }
 
-      // Start/stop polling based on report_ready
       if (!reportReady) {
-        if (!pollRef.current) {
-          pollRef.current = setInterval(() => loadReport(true), 12000);
-        }
+        if (!pollRef.current) pollRef.current = setInterval(() => loadReport(true), 12000);
       } else {
-        if (pollRef.current) {
-          clearInterval(pollRef.current);
-          pollRef.current = null;
-        }
+        if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
       }
     } catch (err: any) {
       if (!silent) setError(err?.message ?? "Failed to load report");
@@ -531,32 +353,57 @@ export default function SessionReportScreen() {
   const filteredWindows = useMemo(() => {
     if (!report) return [];
     switch (filter) {
-      case "abnormal":
-        return report.windows.filter((w) => w.predicted_label !== "Normal");
-      case "aggressive":
-        return report.windows.filter((w) => w.predicted_label === "Aggressive");
-      case "drowsy":
-        return report.windows.filter((w) => w.predicted_label === "Drowsy");
-      case "normal":
-        return report.windows.filter((w) => w.predicted_label === "Normal");
-      default:
-        return report.windows;
+      case "Abnormal": return report.windows.filter((w) => w.predicted_label !== "Normal");
+      case "Aggressive": return report.windows.filter((w) => w.predicted_label === "Aggressive");
+      case "Drowsy": return report.windows.filter((w) => w.predicted_label === "Drowsy");
+      case "Normal": return report.windows.filter((w) => w.predicted_label === "Normal");
+      default: return report.windows;
     }
   }, [report, filter]);
+
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(filteredWindows.length / WINDOWS_PER_PAGE));
+  const safePage = Math.min(timelinePage, totalPages - 1);
+  const paginatedWindows = filteredWindows.slice(safePage * WINDOWS_PER_PAGE, (safePage + 1) * WINDOWS_PER_PAGE);
 
   const selectedWindowData = useMemo(() => {
     if (selectedWindow === null || !report) return null;
     return report.windows.find((w) => w.window_id === selectedWindow) ?? null;
   }, [report, selectedWindow]);
 
-  // ── Navigation between abnormal windows ────────────────────────────────
-
   const abnormalWindows = useMemo(() => {
     if (!report) return [];
-    return report.windows
-      .filter((w) => w.predicted_label !== "Normal")
-      .map((w) => w.window_id);
+    return report.windows.filter((w) => w.predicted_label !== "Normal").map((w) => w.window_id);
   }, [report]);
+
+  // ── Filter chip options ────────────────────────────────────────────────
+
+  const filterOptions: ChipOption[] = useMemo(() => {
+    if (!report) return [];
+    const ws = report.window_summary;
+    return [
+      { label: "All", count: ws.total, color: colors.blue },
+      { label: "Abnormal", count: ws.aggressive + ws.drowsy, color: colors.orange },
+      { label: "Aggressive", count: ws.aggressive, color: colors.red },
+      { label: "Drowsy", count: ws.drowsy, color: colors.amber },
+      { label: "Normal", count: ws.normal, color: colors.green },
+    ];
+  }, [report]);
+
+  // ── AI feedback as recommendations ─────────────────────────────────────
+
+  const recommendations: Recommendation[] = useMemo(() => {
+    if (!report?.ai_feedback) return [];
+    return report.ai_feedback.map((f, i) => ({
+      id: `ai-${i}`,
+      icon: f.icon || "💡",
+      title: f.title,
+      message: f.message,
+      priority: (f.priority as "high" | "medium" | "low") ?? "medium",
+    }));
+  }, [report]);
+
+  // ── Navigation ─────────────────────────────────────────────────────────
 
   function jumpToNext() {
     if (abnormalWindows.length === 0) return;
@@ -568,14 +415,18 @@ export default function SessionReportScreen() {
   function jumpToPrev() {
     if (abnormalWindows.length === 0) return;
     const currentIdx = abnormalWindows.indexOf(selectedWindow ?? -1);
-    const prevIdx =
-      currentIdx <= 0 ? abnormalWindows.length - 1 : currentIdx - 1;
+    const prevIdx = currentIdx <= 0 ? abnormalWindows.length - 1 : currentIdx - 1;
     selectWindow(abnormalWindows[prevIdx]);
   }
 
   function selectWindow(id: number) {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setSelectedWindow(id);
+  }
+
+  function handleFilterChange(label: string) {
+    setFilter(label as FilterMode);
+    setTimelinePage(0);
   }
 
   // ── Loading / Error states ─────────────────────────────────────────────
@@ -596,10 +447,7 @@ export default function SessionReportScreen() {
         <Text style={[page.centerText, { color: colors.red, marginTop: 12 }]}>
           {error ?? "Report not found"}
         </Text>
-        <Pressable
-          onPress={() => loadReport()}
-          style={[s.retryBtn]}
-        >
+        <Pressable onPress={() => loadReport()} style={s.retryBtn}>
           <Text style={s.retryBtnText}>Retry</Text>
         </Pressable>
       </View>
@@ -616,7 +464,7 @@ export default function SessionReportScreen() {
             <Ionicons name="chevron-back" size={20} color={colors.text} />
             <Text style={s.backBtnText}>Back</Text>
           </Pressable>
-          <View style={[s.pendingCard]}>
+          <View style={s.pendingCard}>
             <Text style={s.pendingIcon}>⏳</Text>
             <Text style={s.pendingTitle}>Report Pending</Text>
             <Text style={s.pendingText}>
@@ -630,6 +478,7 @@ export default function SessionReportScreen() {
   }
 
   const { window_summary: ws } = report;
+  const flaggedCount = ws.aggressive + ws.drowsy;
 
   // ── Render ─────────────────────────────────────────────────────────────
 
@@ -641,54 +490,37 @@ export default function SessionReportScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* ── Back Button ──────────────────────────────────────────────── */}
-        <Pressable
-          onPress={() => router.back()}
-          style={s.backBtn}
-          hitSlop={12}
-        >
+        <Pressable onPress={() => router.back()} style={s.backBtn} hitSlop={12}>
           <Ionicons name="chevron-back" size={20} color={colors.text} />
           <Text style={s.backBtnText}>Back</Text>
         </Pressable>
 
-        {/* ── 1. Session Overview Card ─────────────────────────────────── */}
-        <View style={[card.base, s.overviewCard]}>
-          <View style={s.overviewTop}>
-            <View style={{ flex: 1 }}>
-              <Text style={s.overviewTitle}>Session Report</Text>
-              <View style={s.metaRow}>
-                {report.date && (
-                  <View style={s.metaItem}>
-                    <Ionicons name="calendar-outline" size={14} color={colors.subtext} />
-                    <Text style={s.metaText}>{report.date}</Text>
-                  </View>
-                )}
-                <View style={s.metaItem}>
-                  <Ionicons name="car-outline" size={14} color={colors.subtext} />
-                  <Text style={s.metaText}>{report.road_type}</Text>
-                </View>
-                <View style={s.metaItem}>
-                  <Ionicons name="time-outline" size={14} color={colors.subtext} />
-                  <Text style={s.metaText}>
-                    {report.total_windows * 4} min ({report.total_windows} windows)
-                  </Text>
-                </View>
-              </View>
-            </View>
-            <ScoreRing score={report.performance_score} size={90} />
+        {/* ── 1. Metrics Strip ─────────────────────────────────────────── */}
+        <View style={s.metricsStrip}>
+          <View style={s.scoreRingCard}>
+            <ScoreRing score={report.performance_score} size={100} />
           </View>
+          <View style={s.metricsRight}>
+            <MetricCard label="Windows" value={report.total_windows} icon="📊" tintKey="blue" subtitle={`${report.total_windows * 4} min total`} />
+            <MetricCard label="Flagged" value={flaggedCount} icon="⚠️" tintKey={flaggedCount > 0 ? "red" : "green"} subtitle={flaggedCount === 0 ? "All clear" : `${ws.aggressive} aggressive, ${ws.drowsy} drowsy`} />
+            <MetricCard label="Road Type" value={report.road_type} icon="🛣️" tintKey="indigo" subtitle={report.date ?? ""} />
+          </View>
+        </View>
 
-          <View style={divider.base} />
-
-          {/* Behavior Breakdown */}
+        {/* ── 2. Behavior Breakdown ────────────────────────────────────── */}
+        <View style={card.base}>
+          <SectionHeader icon="📈" iconBg={colors.greenBorderAlt} label="Behavior Breakdown" />
           <BehaviorBar
             normal={ws.normal}
             aggressive={ws.aggressive}
             drowsy={ws.drowsy}
             total={ws.total}
+            height={20}
+            showPercentages
           />
         </View>
 
-        {/* ── 2. Window Timeline ───────────────────────────────────────── */}
+        {/* ── 3. Window Timeline ───────────────────────────────────────── */}
         <View style={card.base}>
           <SectionHeader
             icon="📊"
@@ -714,52 +546,18 @@ export default function SessionReportScreen() {
           />
 
           {/* Filters */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={s.filterRow}
-            contentContainerStyle={{ gap: 8 }}
-          >
-            <FilterChip
-              label="All"
-              count={ws.total}
-              active={filter === "all"}
-              color={colors.blue}
-              onPress={() => setFilter("all")}
+          <View style={s.filterRow}>
+            <FilterChips
+              options={filterOptions}
+              value={filter}
+              onChange={handleFilterChange}
+              showCounts
             />
-            <FilterChip
-              label="Abnormal"
-              count={ws.aggressive + ws.drowsy}
-              active={filter === "abnormal"}
-              color="#F97316"
-              onPress={() => setFilter("abnormal")}
-            />
-            <FilterChip
-              label="Aggressive"
-              count={ws.aggressive}
-              active={filter === "aggressive"}
-              color={colors.red}
-              onPress={() => setFilter("aggressive")}
-            />
-            <FilterChip
-              label="Drowsy"
-              count={ws.drowsy}
-              active={filter === "drowsy"}
-              color={colors.yellow}
-              onPress={() => setFilter("drowsy")}
-            />
-            <FilterChip
-              label="Normal"
-              count={ws.normal}
-              active={filter === "normal"}
-              color={colors.green}
-              onPress={() => setFilter("normal")}
-            />
-          </ScrollView>
+          </View>
 
-          {/* Timeline Grid */}
+          {/* Timeline Grid (paginated) */}
           <View style={s.timelineGrid}>
-            {filteredWindows.map((w, idx) => (
+            {paginatedWindows.map((w, idx) => (
               <WindowBlock
                 key={w.window_id}
                 window={w}
@@ -768,15 +566,36 @@ export default function SessionReportScreen() {
                 onPress={() => selectWindow(w.window_id)}
               />
             ))}
-            {filteredWindows.length === 0 && (
-              <Text style={s.emptyTimeline}>
-                No windows match this filter.
-              </Text>
+            {paginatedWindows.length === 0 && (
+              <Text style={s.emptyTimeline}>No windows match this filter.</Text>
             )}
           </View>
 
+          {/* Page Controls */}
+          {totalPages > 1 && (
+            <View style={s.pageControls}>
+              <Pressable
+                onPress={() => setTimelinePage(Math.max(0, safePage - 1))}
+                disabled={safePage === 0}
+                style={({ pressed }) => [s.pageBtn, safePage === 0 && { opacity: 0.3 }, pressed && { opacity: 0.6 }]}
+              >
+                <Ionicons name="chevron-back" size={16} color={colors.text} />
+              </Pressable>
+              <Text style={s.pageLabel}>
+                Page {safePage + 1} of {totalPages}
+              </Text>
+              <Pressable
+                onPress={() => setTimelinePage(Math.min(totalPages - 1, safePage + 1))}
+                disabled={safePage >= totalPages - 1}
+                style={({ pressed }) => [s.pageBtn, safePage >= totalPages - 1 && { opacity: 0.3 }, pressed && { opacity: 0.6 }]}
+              >
+                <Ionicons name="chevron-forward" size={16} color={colors.text} />
+              </Pressable>
+            </View>
+          )}
+
           {/* Time axis labels */}
-          {filter === "all" && report.windows.length > 0 && (
+          {filter === "All" && report.windows.length > 0 && (
             <View style={s.timeAxis}>
               <Text style={s.timeAxisLabel}>0:00</Text>
               <Text style={s.timeAxisLabel}>
@@ -795,26 +614,28 @@ export default function SessionReportScreen() {
           )}
         </View>
 
-        {/* ── 3. Selected Window Detail ────────────────────────────────── */}
+        {/* ── 4. Selected Window Detail ────────────────────────────────── */}
         {selectedWindowData ? (
           <FeedbackPanel window={selectedWindowData} />
         ) : (
           <View style={[card.base, s.noSelectionCard]}>
             <Ionicons name="hand-left-outline" size={28} color={colors.muted} />
-            <Text style={s.noSelectionText}>
-              Tap a window above to see detailed feedback
-            </Text>
+            <Text style={s.noSelectionText}>Tap a window above to see detailed feedback</Text>
           </View>
         )}
 
-        {/* ── 4. Session Summary (LLM) ─────────────────────────────────── */}
+        {/* ── 5. AI Feedback ───────────────────────────────────────────── */}
+        {recommendations.length > 0 && (
+          <View style={card.base}>
+            <SectionHeader icon="💡" iconBg={tint.amber.bg} label="AI Recommendations" />
+            <RecommendationQueue items={recommendations} maxVisible={3} />
+          </View>
+        )}
+
+        {/* ── 6. Session Summary (LLM) ─────────────────────────────────── */}
         {report.summary_feedback && (
           <View style={card.base}>
-            <SectionHeader
-              icon="🧠"
-              iconBg={colors.purpleLighter ?? "#F4EFFF"}
-              label="Session Summary"
-            />
+            <SectionHeader icon="🧠" iconBg={colors.purpleLighter ?? "#F4EFFF"} label="Session Summary" />
             <View style={s.summaryBox}>
               <Ionicons name="sparkles" size={18} color={colors.purpleDark} />
               <Text style={s.summaryText}>{report.summary_feedback}</Text>
@@ -822,22 +643,27 @@ export default function SessionReportScreen() {
           </View>
         )}
 
-        {/* ── 5. Instructor Notes ──────────────────────────────────────── */}
+        {/* ── 7. Instructor Notes ──────────────────────────────────────── */}
         {!!report.instructor_notes?.trim() && (
           <View style={[card.base, s.instructorNotesCard]}>
-            <SectionHeader
-              icon="📝"
-              iconBg="#FFF7ED"
-              label="Instructor Notes"
-            />
-            <Text style={s.instructorNotesText}>"{report.instructor_notes.trim()}"</Text>
+            <SectionHeader icon="📝" iconBg={tint.orange.bg} label="Instructor Notes" />
+            <Text
+              style={s.instructorNotesText}
+              numberOfLines={notesExpanded ? undefined : 3}
+            >
+              "{report.instructor_notes.trim()}"
+            </Text>
+            {report.instructor_notes.trim().length > 150 && (
+              <Pressable onPress={() => setNotesExpanded(!notesExpanded)}>
+                <Text style={s.readMoreText}>{notesExpanded ? "Show less" : "Read more"}</Text>
+              </Pressable>
+            )}
             {report.instructor && (
               <Text style={s.instructorName}>— {report.instructor}</Text>
             )}
           </View>
         )}
 
-        {/* Bottom spacer */}
         <View style={{ height: 40 }} />
       </ScrollView>
     </View>
@@ -859,138 +685,25 @@ const s = StyleSheet.create({
   },
   backBtnText: {
     fontSize: 14,
-    fontWeight: "600",
+    fontFamily: fonts.semibold,
     color: colors.text,
   },
 
-  // ── Section header
-  sectionHeaderRow: {
+  // ── Metrics strip
+  metricsStrip: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 14,
+    gap: 16,
+    alignItems: "stretch",
   },
-  sectionHeaderLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  sectionIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+  scoreRingCard: {
+    ...card.base,
     alignItems: "center",
     justifyContent: "center",
+    paddingHorizontal: 20,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.text,
-    letterSpacing: -0.2,
-  },
-
-  // ── Overview card
-  overviewCard: {
-    // extra styling if needed
-  },
-  overviewTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-  },
-  overviewTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: colors.text,
-    letterSpacing: -0.5,
-    marginBottom: 8,
-  },
-  metaRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-  },
-  metaItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  metaText: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: colors.subtext,
-  },
-
-  // ── Score Ring
-  scoreValue: {
-    fontSize: 26,
-    fontWeight: "900",
-    letterSpacing: -1,
-  },
-  scoreLabel: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: colors.muted,
-    marginTop: -2,
-  },
-
-  // ── Behavior Bar
-  behaviorBarTrack: {
-    flexDirection: "row",
-    height: 10,
-    borderRadius: 6,
-    backgroundColor: colors.borderLight,
-    overflow: "hidden",
-    marginBottom: 10,
-  },
-  behaviorBarSeg: {
-    height: "100%",
-  },
-  behaviorLegend: {
-    flexDirection: "row",
-    gap: 16,
-  },
-  legendItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-  },
-  legendDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  legendText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: colors.subtext,
-  },
-
-  // ── Filter chips
-  filterRow: {
-    marginBottom: 14,
-    flexGrow: 0,
-  },
-  filterChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    backgroundColor: colors.cardBg,
-  },
-  chipDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
-  },
-  filterChipText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: colors.text,
+  metricsRight: {
+    flex: 1,
+    gap: 8,
   },
 
   // ── Navigation arrows
@@ -1009,10 +722,15 @@ const s = StyleSheet.create({
   },
   navLabel: {
     fontSize: 12,
-    fontWeight: "700",
-    color: colors.subtext,
+    fontFamily: fonts.bold,
+    color: colors.text,
     minWidth: 40,
     textAlign: "center",
+  },
+
+  // ── Filter row
+  filterRow: {
+    marginBottom: 14,
   },
 
   // ── Timeline Grid
@@ -1038,13 +756,38 @@ const s = StyleSheet.create({
   },
   windowBlockNum: {
     fontSize: 11,
-    fontWeight: "700",
+    fontFamily: fonts.bold,
   },
   emptyTimeline: {
     fontSize: 13,
     color: colors.subtext,
     fontStyle: "italic",
     paddingVertical: 12,
+  },
+
+  // ── Page controls
+  pageControls: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    paddingVertical: 8,
+    marginTop: 4,
+  },
+  pageBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.borderLight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pageLabel: {
+    fontSize: 12,
+    fontFamily: fonts.bold,
+    color: colors.subtext,
+    minWidth: 90,
+    textAlign: "center",
   },
 
   // ── Time axis
@@ -1056,19 +799,17 @@ const s = StyleSheet.create({
   },
   timeAxisLabel: {
     fontSize: 10,
-    fontWeight: "600",
+    fontFamily: fonts.semibold,
     color: colors.muted,
   },
 
   // ── Feedback Panel
   feedbackPanel: {
     backgroundColor: colors.cardBg,
-    borderRadius: radius.card ?? 16,
-    padding: space.card ?? 16,
+    borderRadius: radius.card,
+    padding: space.card,
     borderLeftWidth: 4,
-    ...(Platform.OS === "ios"
-  ? { shadowColor: "#000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 4 }
-  : { elevation: 2 }),
+    ...shadow.card,
   },
   feedbackHeader: {
     flexDirection: "row",
@@ -1084,12 +825,12 @@ const s = StyleSheet.create({
   },
   feedbackTitle: {
     fontSize: 15,
-    fontWeight: "700",
+    fontFamily: fonts.semibold,
     color: colors.text,
   },
   feedbackTime: {
     fontSize: 12,
-    fontWeight: "500",
+    fontFamily: fonts.medium,
     color: colors.subtext,
     marginTop: 2,
   },
@@ -1100,7 +841,7 @@ const s = StyleSheet.create({
   },
   severityText: {
     fontSize: 11,
-    fontWeight: "700",
+    fontFamily: fonts.bold,
   },
 
   // ── Alert cause
@@ -1108,7 +849,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "#FEF9C3",
+    backgroundColor: colors.amberBg,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
@@ -1116,8 +857,8 @@ const s = StyleSheet.create({
   },
   alertCauseText: {
     fontSize: 13,
-    fontWeight: "500",
-    color: "#92400E",
+    fontFamily: fonts.medium,
+    color: colors.amberDark,
   },
 
   // ── Trigger features
@@ -1126,7 +867,7 @@ const s = StyleSheet.create({
   },
   triggerLabel: {
     fontSize: 12,
-    fontWeight: "700",
+    fontFamily: fonts.bold,
     color: colors.subtext,
     textTransform: "uppercase",
     letterSpacing: 0.5,
@@ -1140,26 +881,27 @@ const s = StyleSheet.create({
   triggerCard: {
     flex: 1,
     minWidth: 130,
+    maxWidth: 220,
     backgroundColor: colors.pageBg,
     borderRadius: 10,
-    padding: 12,
+    padding: space.card,
     borderWidth: 1,
     borderColor: colors.borderLight,
   },
   triggerFeatureName: {
     fontSize: 11,
-    fontWeight: "600",
+    fontFamily: fonts.semibold,
     color: colors.subtext,
     marginBottom: 4,
   },
   triggerFeatureValue: {
     fontSize: 16,
-    fontWeight: "800",
+    fontFamily: fonts.extrabold,
     color: colors.text,
   },
   triggerFeatureUnit: {
     fontSize: 12,
-    fontWeight: "500",
+    fontFamily: fonts.medium,
     color: colors.muted,
   },
 
@@ -1177,12 +919,12 @@ const s = StyleSheet.create({
   },
   llmFeedbackTitle: {
     fontSize: 13,
-    fontWeight: "700",
+    fontFamily: fonts.bold,
     color: colors.purpleDark,
   },
   llmFeedbackText: {
     fontSize: 13.5,
-    fontWeight: "500",
+    fontFamily: fonts.regular,
     color: colors.text,
     lineHeight: 20,
   },
@@ -1196,7 +938,7 @@ const s = StyleSheet.create({
   },
   noSelectionText: {
     fontSize: 14,
-    fontWeight: "500",
+    fontFamily: fonts.medium,
     color: colors.muted,
     textAlign: "center",
   },
@@ -1213,7 +955,7 @@ const s = StyleSheet.create({
   summaryText: {
     flex: 1,
     fontSize: 13.5,
-    fontWeight: "500",
+    fontFamily: fonts.regular,
     color: colors.text,
     lineHeight: 20,
   },
@@ -1228,14 +970,14 @@ const s = StyleSheet.create({
   },
   retryBtnText: {
     fontSize: 14,
-    fontWeight: "700",
+    fontFamily: fonts.bold,
     color: "#FFFFFF",
   },
 
   // ── Pending state
   pendingCard: {
     backgroundColor: colors.cardBg,
-    borderRadius: radius.card ?? 16,
+    borderRadius: radius.card,
     padding: 32,
     alignItems: "center",
     marginTop: 16,
@@ -1246,13 +988,13 @@ const s = StyleSheet.create({
   pendingIcon: { fontSize: 40 },
   pendingTitle: {
     fontSize: 18,
-    fontWeight: "800",
+    fontFamily: fonts.extrabold,
     color: colors.text,
     marginTop: 4,
   },
   pendingText: {
     fontSize: 13,
-    fontWeight: "500",
+    fontFamily: fonts.medium,
     color: colors.subtext,
     textAlign: "center",
     lineHeight: 20,
@@ -1264,15 +1006,20 @@ const s = StyleSheet.create({
   },
   instructorNotesText: {
     fontSize: 13.5,
-    fontWeight: "500",
+    fontFamily: fonts.medium,
     color: colors.text,
     lineHeight: 21,
     fontStyle: "italic",
   },
   instructorName: {
     fontSize: 12,
-    fontWeight: "700",
+    fontFamily: fonts.bold,
     color: colors.subtext,
     marginTop: 4,
+  },
+  readMoreText: {
+    fontSize: 12,
+    fontFamily: fonts.bold,
+    color: colors.blue,
   },
 });

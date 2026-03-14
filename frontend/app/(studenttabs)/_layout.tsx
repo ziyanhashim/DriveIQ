@@ -6,7 +6,7 @@ import { router, usePathname, useGlobalSearchParams } from "expo-router";
 import { Slot } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { clearToken } from "../../lib/token";
-import { colors, type_, radius, space, shadow } from "../../lib/theme";
+import { colors, type_, radius, space, shadow, fonts } from "../../lib/theme";
 
 const TABS = [
   { name: "dashboard", label: "Dashboard", icon: "⊞" },
@@ -166,8 +166,8 @@ const s = StyleSheet.create({
   // Logo
   logoWrap:  { flexDirection: "row", alignItems: "center", gap: space.sm, marginRight: space.sm },
   logoBox:   { width: 32, height: 32, borderRadius: radius.sm, backgroundColor: colors.blue, alignItems: "center", justifyContent: "center" },
-  logoText:  { color: "#FFFFFF", fontWeight: "900", fontSize: 13 },
-  logoLabel: { color: colors.blue, fontWeight: "900", fontSize: 15 },
+  logoText:  { color: "#FFFFFF", fontFamily: fonts.extrabold, fontSize: 13 },
+  logoLabel: { color: colors.blue, fontFamily: fonts.extrabold, fontSize: 15 },
 
   // Tabs
   tabsRow:       { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 2 },
@@ -176,14 +176,14 @@ const s = StyleSheet.create({
   tabPressed:    { opacity: 0.7 },
   tabIcon:       { fontSize: 14, color: colors.subtext },
   tabIconActive: { color: "#FFFFFF" },
-  tabLabel:      { fontSize: 13, fontWeight: "700", color: "#374151" },
-  tabLabelActive:{ color: "#FFFFFF", fontWeight: "700", fontSize: 13 },
+  tabLabel:      { fontSize: 13, fontFamily: fonts.bold, color: "#374151" },
+  tabLabelActive:{ color: "#FFFFFF", fontFamily: fonts.bold, fontSize: 13 },
 
   // User pill
   userWrap:   { flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: space.sm, paddingVertical: 6, borderRadius: radius.sm },
   avatar:     { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.purpleDark, alignItems: "center", justifyContent: "center" },
-  avatarText: { color: "#FFFFFF", fontWeight: "900", fontSize: 13 },
-  userName:   { fontSize: 13, fontWeight: "700", color: colors.textAlt },
+  avatarText: { color: "#FFFFFF", fontFamily: fonts.extrabold, fontSize: 13 },
+  userName:   { fontSize: 13, fontFamily: fonts.bold, color: colors.textAlt },
   chevron:    { fontSize: 12, color: colors.subtext },
 
   // Hamburger
@@ -196,7 +196,7 @@ const s = StyleSheet.create({
   mobileItem:      { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: space.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.borderFaint },
   mobileItemActive:{ backgroundColor: colors.purpleLight },
   mobileIcon:      { fontSize: 16, color: colors.subtext },
-  mobileLabel:     { fontSize: 14, fontWeight: "700", color: "#374151" },
+  mobileLabel:     { fontSize: 14, fontFamily: fonts.bold, color: "#374151" },
   mobileLabelActive:{ color: colors.purpleDark },
 
   // Content
@@ -206,7 +206,7 @@ const s = StyleSheet.create({
   userDropdown: { position: "absolute", top: 44, right: 0, backgroundColor: colors.cardBg, borderRadius: radius.input, borderWidth: 1, borderColor: colors.borderFaint, minWidth: 180, zIndex: 999, ...shadow.dropdown },
   ddItem:       { paddingHorizontal: space.lg, paddingVertical: 13 },
   ddItemBorder: { borderBottomWidth: 1, borderBottomColor: colors.borderFaint },
-  ddText:       { fontSize: 14, fontWeight: "700", color: "#374151" },
+  ddText:       { fontSize: 14, fontFamily: fonts.bold, color: "#374151" },
   ddSignOut:    { marginTop: 2 },
-  ddSignOutText:{ color: colors.redDark, fontWeight: "800" },
+  ddSignOutText:{ color: colors.redDark, fontFamily: fonts.extrabold },
 });

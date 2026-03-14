@@ -11,6 +11,38 @@
 import { Platform, StyleSheet } from "react-native";
 
 // ─────────────────────────────────────────────────────────────────────────────
+// FONT FAMILIES (Sora + Space Mono — loaded in app/layout.tsx)
+// Sora: headings & body — geometric, modern, approachable
+// Space Mono: data & stats — monospace precision for metrics
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const fonts = {
+  // Sora (headings & body)
+  regular:   "Sora_400Regular",
+  medium:    "Sora_500Medium",
+  semibold:  "Sora_600SemiBold",
+  bold:      "Sora_700Bold",
+  extrabold: "Sora_800ExtraBold",
+  // Space Mono (data & stats)
+  mono:      "SpaceMono_400Regular",
+  monoBold:  "SpaceMono_700Bold",
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CURSOR HELPERS (web only)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const cursor = Platform.OS === "web" ? {
+  pointer:    { cursor: "pointer" as any },
+  text:       { cursor: "text" as any },
+  notAllowed: { cursor: "not-allowed" as any },
+} : {
+  pointer:    {},
+  text:       {},
+  notAllowed: {},
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 // COLORS
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -77,6 +109,18 @@ export const colors = {
   yellowBorderAlt:"#FFD48A",
   yellowBg:       "#FEF3C7",
 
+  // ── Amber (drowsy behavior — distinct from yellow/achievements)
+  amber:          "#D97706",
+  amberDark:      "#92400E",
+  amberLight:     "#FFFBEB",
+  amberBorder:    "#FDE68A",
+  amberBg:        "#FEF9C3",
+
+  // ── Orange (abnormal/warning severity)
+  orange:         "#F97316",
+  orangeLight:    "#FFF7ED",
+  orangeBorder:   "#FDBA74",
+
   // ── Red (errors, cancelled, destructive)
   red:            "#EF4444",
   redDark:        "#DC2626",
@@ -91,8 +135,16 @@ export const colors = {
   borderMid:      "#E2E8F0",
   borderFaint:    "#F3F4F6",
 
+  // ── Disabled / muted states
+  disabled:       "#9CA3AF",
+  disabledBg:     "#F3F4F6",
+  disabledBorder: "#E5E7EB",
+
   // ── Primary dark button
   darkBtn:        "#0B1220",
+
+  // ── Toast / overlay
+  toast:          "#1F2937",
 
   // ── Indigo (sessions avatar, chart)
   indigo:         "#4F46E5",
@@ -103,68 +155,74 @@ export const colors = {
 // ─────────────────────────────────────────────────────────────────────────────
 // TYPOGRAPHY
 // Named by semantic role to match Figma layer names.
+// Weight hierarchy: 400 (body light) → 500 (body) → 600 (label) → 700 (title) → 800 (display)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const type_ = StyleSheet.create({
   // Page headings
-  pageTitle:        { fontSize: 18, fontWeight: "900", color: colors.text },
-  pageTitleLg:      { fontSize: 20, fontWeight: "900", color: colors.textAlt },
-  pageSubtitle:     { fontSize: 12, fontWeight: "600", color: colors.subtext, marginTop: 4 },
-  pageSubtitleBold: { fontSize: 12, fontWeight: "700", color: colors.subtextAlt },
+  pageTitle:        { fontFamily: fonts.extrabold, fontSize: 18, color: colors.text, letterSpacing: -0.3 },
+  pageTitleLg:      { fontFamily: fonts.extrabold, fontSize: 22, color: colors.textAlt, letterSpacing: -0.5 },
+  pageSubtitle:     { fontFamily: fonts.medium, fontSize: 13, color: colors.subtext, marginTop: 4 },
+  pageSubtitleBold: { fontFamily: fonts.semibold, fontSize: 13, color: colors.subtextAlt },
 
   // Auth screens (login / signup)
-  authTitle:    { fontSize: 18, fontWeight: "800", color: colors.textAlt, marginTop: 6 },
-  authSubtitle: { fontSize: 13, color: colors.subtextAlt, marginTop: 6, marginBottom: 14 },
+  authTitle:    { fontFamily: fonts.extrabold, fontSize: 18, color: colors.textAlt, marginTop: 6 },
+  authSubtitle: { fontFamily: fonts.regular, fontSize: 13, color: colors.subtextAlt, marginTop: 6, marginBottom: 14 },
 
   // Cards / sections
-  cardTitle:    { fontSize: 14, fontWeight: "900", color: colors.textAlt },
-  sectionTitle: { fontSize: 13, fontWeight: "900", color: colors.text },
-  sectionSub:   { fontSize: 12, fontWeight: "700", color: colors.subtextAlt },
+  cardTitle:    { fontFamily: fonts.bold, fontSize: 15, color: colors.textAlt, letterSpacing: -0.2 },
+  sectionTitle: { fontFamily: fonts.bold, fontSize: 13, color: colors.text, letterSpacing: 0.2, textTransform: "uppercase" as any },
+  sectionSub:   { fontFamily: fonts.medium, fontSize: 12, color: colors.subtextAlt },
 
-  // Score displays
-  displayScore: { fontSize: 34, fontWeight: "900", color: colors.text },
-  scoreValue:   { fontSize: 15, fontWeight: "900", color: colors.textAlt },
-  scoreMid:     { fontSize: 18, fontWeight: "900" },
+  // Score displays (Space Mono — monospace precision for data readouts)
+  displayScore: { fontFamily: fonts.monoBold, fontSize: 32, color: colors.text, letterSpacing: -1 },
+  displayLg:    { fontFamily: fonts.monoBold, fontSize: 28, color: colors.text, letterSpacing: -0.8 },
+  displayMd:    { fontFamily: fonts.monoBold, fontSize: 24, color: colors.text, letterSpacing: -0.5 },
+  scoreValue:   { fontFamily: fonts.monoBold, fontSize: 15, color: colors.textAlt },
+  scoreMid:     { fontFamily: fonts.monoBold, fontSize: 18 },
 
   // Body text
-  body:         { fontSize: 12, fontWeight: "700",  color: colors.text,        lineHeight: 18 },
-  bodyMedium:   { fontSize: 12, fontWeight: "600",  color: colors.text,        lineHeight: 18 },
-  bodySm:       { fontSize: 11, fontWeight: "700",  color: colors.subtextAlt,  lineHeight: 16 },
+  body:         { fontFamily: fonts.medium, fontSize: 13, color: colors.text,        lineHeight: 20 },
+  bodyMedium:   { fontFamily: fonts.regular, fontSize: 13, color: colors.text,        lineHeight: 20 },
+  bodySm:       { fontFamily: fonts.medium, fontSize: 12, color: colors.subtextAlt,  lineHeight: 17 },
 
   // Form labels
-  label:        { fontSize: 12, fontWeight: "700",  color: colors.label,      marginBottom: 6 },
-  labelBold:    { fontSize: 12, fontWeight: "900",  color: colors.textAlt,    marginBottom: 8 },
-  labelSm:      { fontSize: 11, fontWeight: "800",  color: colors.subtextAlt },
+  label:        { fontFamily: fonts.semibold, fontSize: 12, color: colors.label,      marginBottom: 6 },
+  labelBold:    { fontFamily: fonts.bold, fontSize: 12, color: colors.textAlt,    marginBottom: 8 },
+  labelSm:      { fontFamily: fonts.semibold, fontSize: 11, color: colors.subtextAlt, textTransform: "uppercase" as any, letterSpacing: 0.5 },
+
+  // Caption
+  caption:      { fontFamily: fonts.medium, fontSize: 10, color: colors.muted, letterSpacing: 0.3 },
 
   // Input text
-  inputText:    { fontSize: 14, color: colors.textAlt },
-  inputTextSm:  { fontSize: 12, fontWeight: "800", color: colors.text },
+  inputText:    { fontFamily: fonts.regular, fontSize: 14, color: colors.textAlt },
+  inputTextSm:  { fontFamily: fonts.bold, fontSize: 12, color: colors.text },
 
   // Buttons
-  btnPrimary:   { color: "#FFFFFF", fontWeight: "900", fontSize: 14 },
-  btnSm:        { color: "#FFFFFF", fontWeight: "900", fontSize: 12 },
-  btnOutline:   { color: colors.label, fontWeight: "900", fontSize: 12 },
+  btnPrimary:   { fontFamily: fonts.bold, color: "#FFFFFF", fontSize: 14, letterSpacing: 0.2 },
+  btnSm:        { fontFamily: fonts.bold, color: "#FFFFFF", fontSize: 12 },
+  btnOutline:   { fontFamily: fonts.bold, color: colors.label, fontSize: 12 },
 
   // Pills & chips
-  pill:         { fontSize: 11, fontWeight: "900" },
-  chip:         { fontSize: 11, fontWeight: "900", color: colors.text },
+  pill:         { fontFamily: fonts.bold, fontSize: 11 },
+  chip:         { fontFamily: fonts.bold, fontSize: 11, color: colors.text },
 
   // Links
-  link:         { fontSize: 12, fontWeight: "800", color: colors.blue },
-  linkMuted:    { fontSize: 12, fontWeight: "700", color: colors.subtextAlt },
+  link:         { fontFamily: fonts.bold, fontSize: 12, color: colors.blue },
+  linkMuted:    { fontFamily: fonts.semibold, fontSize: 12, color: colors.subtextAlt },
 
   // Meta (dates, IDs, vehicles)
-  meta:         { fontSize: 11, fontWeight: "800", color: colors.subtextAlt },
-  metaValue:    { fontSize: 12, fontWeight: "900", color: colors.textAlt, marginTop: 2 },
+  meta:         { fontFamily: fonts.semibold, fontSize: 11, color: colors.subtextAlt },
+  metaValue:    { fontFamily: fonts.bold, fontSize: 13, color: colors.textAlt, marginTop: 2 },
 
   // Footer
-  footer:       { fontSize: 11, fontWeight: "700", color: colors.muted, textAlign: "center" },
+  footer:       { fontFamily: fonts.medium, fontSize: 11, color: colors.muted, textAlign: "center" },
 
   // Dark theme variants
-  darkTitle:    { fontSize: 26, fontWeight: "900", color: "#FFFFFF" },
-  darkHeading:  { fontSize: 16, fontWeight: "900", color: "#FFFFFF" },
-  darkBody:     { fontSize: 13, fontWeight: "700", color: colors.darkSubtext },
-  darkBodySm:   { fontSize: 11, fontWeight: "800", color: colors.darkSubtext },
+  darkTitle:    { fontFamily: fonts.extrabold, fontSize: 26, color: "#FFFFFF" },
+  darkHeading:  { fontFamily: fonts.extrabold, fontSize: 16, color: "#FFFFFF" },
+  darkBody:     { fontFamily: fonts.medium, fontSize: 13, color: colors.darkSubtext },
+  darkBodySm:   { fontFamily: fonts.semibold, fontSize: 11, color: colors.darkSubtext },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -178,9 +236,11 @@ export const space = {
   lg:     16,
   xl:     20,
   xxl:    24,
-  page:   16,
-  card:   14,
-  cardLg: 16,
+  xxxl:   32,
+  page:   20,
+  card:   16,
+  cardLg: 20,
+  sectionGap: 8,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -207,13 +267,21 @@ export const radius = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const shadow = {
+  sm: Platform.select({
+    ios:     { shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4,  shadowOffset: { width: 0, height: 1 } },
+    android: { elevation: 1 },
+  }),
   navbar: Platform.select({
     ios:     { shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 8,  shadowOffset: { width: 0, height: 2 } },
     android: { elevation: 3 },
   }),
   card: Platform.select({
-    ios:     { shadowColor: "#101828", shadowOpacity: 0.08, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } },
+    ios:     { shadowColor: "#101828", shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
     android: { elevation: 2 },
+  }),
+  cardRaised: Platform.select({
+    ios:     { shadowColor: "#101828", shadowOpacity: 0.12, shadowRadius: 16, shadowOffset: { width: 0, height: 8 } },
+    android: { elevation: 4 },
   }),
   dropdown: Platform.select({
     ios:     { shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 16, shadowOffset: { width: 0, height: 4 } },
@@ -236,6 +304,7 @@ export const card = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.card,
     padding: space.card,
+    ...shadow.sm,
   },
   lg: {
     backgroundColor: colors.cardBg,
@@ -243,6 +312,7 @@ export const card = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.cardLg,
     padding: space.cardLg,
+    ...shadow.card,
   },
   inner: {
     borderRadius: radius.input,
@@ -284,8 +354,8 @@ export const input = StyleSheet.create({
     paddingVertical: space.md,
   },
   field:     { flex: 1, color: colors.textAlt, fontSize: 14 },
-  fieldSm:   { flex: 1, color: colors.text, fontWeight: "800", fontSize: 12, padding: 0 },
-  fieldDark: { flex: 1, color: "#E5E7EB", fontWeight: "800" },
+  fieldSm:   { flex: 1, color: colors.text, fontWeight: "700", fontSize: 12, padding: 0 },
+  fieldDark: { flex: 1, color: "#E5E7EB", fontWeight: "700" },
 });
 
 export const btn = StyleSheet.create({
@@ -296,7 +366,7 @@ export const btn = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: colors.darkBtn,
   },
-  primaryDisabled: { backgroundColor: "#6B7280" },
+  primaryDisabled: { backgroundColor: colors.disabled },
   outline: {
     flexDirection: "row",
     alignItems: "center",
@@ -338,22 +408,22 @@ export const avatar = StyleSheet.create({
   md:   { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.indigoBg,    alignItems: "center", justifyContent: "center" },
   lg:   { width: 54, height: 54, borderRadius: 27, backgroundColor: colors.avatarPurple, alignItems: "center", justifyContent: "center" },
   xl:   { width: 88, height: 88, borderRadius: radius.pill, backgroundColor: colors.avatarPurple, alignItems: "center", justifyContent: "center" },
-  textSm: { color: "#FFFFFF", fontWeight: "900", fontSize: 13 },
-  textMd: { color: "#FFFFFF", fontWeight: "900", fontSize: 12 },
-  textLg: { color: "#FFFFFF", fontWeight: "900", fontSize: 16 },
-  textXl: { color: "#FFFFFF", fontWeight: "900", fontSize: 30 },
+  textSm: { color: "#FFFFFF", fontWeight: "700", fontSize: 13 },
+  textMd: { color: "#FFFFFF", fontWeight: "700", fontSize: 12 },
+  textLg: { color: "#FFFFFF", fontWeight: "700", fontSize: 16 },
+  textXl: { color: "#FFFFFF", fontWeight: "700", fontSize: 30 },
   // Sessions-specific (indigo tint)
   sessions: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.indigoBg, alignItems: "center", justifyContent: "center" },
-  sessionsText: { color: colors.indigo, fontWeight: "900", fontSize: 12 },
+  sessionsText: { color: colors.indigo, fontWeight: "700", fontSize: 12 },
 });
 
 export const page = StyleSheet.create({
   base:      { flex: 1, backgroundColor: colors.pageBg },
   alt:       { flex: 1, backgroundColor: colors.pageBgAlt },
-  content:   { padding: space.page, paddingBottom: 32, gap: 14 },
+  content:   { padding: space.page, paddingBottom: 40, gap: 16 },
   dark:      { flex: 1, backgroundColor: colors.darkBg, padding: space.page, paddingTop: 60 },
   center:    { flex: 1, alignItems: "center", justifyContent: "center", padding: space.xxl },
-  centerText:{ marginTop: 12, fontSize: 13, fontWeight: "800", color: colors.subtext },
+  centerText:{ marginTop: 12, fontSize: 13, fontWeight: "600", color: colors.subtext },
 });
 
 export const divider = StyleSheet.create({
@@ -367,12 +437,14 @@ export const divider = StyleSheet.create({
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const tint = {
-  blue:   { bg: "#EFF6FF",           border: colors.blueLighter,    icon: colors.blue      },
-  purple: { bg: colors.purpleLight,  border: colors.purpleBorder,   icon: colors.purpleDark},
-  green:  { bg: colors.greenLight,   border: colors.greenBorderAlt, icon: colors.green     },
-  yellow: { bg: colors.yellowLight,  border: colors.yellowBorder,   icon: colors.yellow    },
-  red:    { bg: colors.redLight,     border: colors.redBorder,      icon: colors.redDeep   },
-  indigo: { bg: colors.indigoBg,     border: colors.indigoBorder,   icon: colors.indigo    },
+  blue:   { bg: "#EFF6FF",           border: colors.blueLighter,    icon: colors.blue,       text: colors.blueDeep   },
+  purple: { bg: colors.purpleLight,  border: colors.purpleBorder,   icon: colors.purpleDark, text: colors.purpleDeep },
+  green:  { bg: colors.greenLight,   border: colors.greenBorderAlt, icon: colors.green,      text: colors.greenDark  },
+  yellow: { bg: colors.yellowLight,  border: colors.yellowBorder,   icon: colors.yellow,     text: "#854D0E"         },
+  red:    { bg: colors.redLight,     border: colors.redBorder,      icon: colors.redDeep,    text: colors.redDark    },
+  indigo: { bg: colors.indigoBg,     border: colors.indigoBorder,   icon: colors.indigo,     text: "#3730A3"         },
+  amber:  { bg: colors.amberBg,      border: colors.amberBorder,    icon: colors.amber,      text: colors.amberDark  },
+  orange: { bg: colors.orangeLight,  border: colors.orangeBorder,   icon: colors.orange,     text: "#C2410C"         },
 } as const;
 
 export type TintKey = keyof typeof tint;

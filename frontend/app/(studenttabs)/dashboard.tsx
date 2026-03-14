@@ -6,15 +6,22 @@ import {
 import { router, useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiGet, apiDelete } from "../../lib/api";
-import { colors, type_, radius, space, shadow, card, btn, pill, page, divider, tint, TintKey } from "../../lib/theme";
+import { colors, fonts, type_, radius, space, shadow, card, btn, pill, page, divider, tint, TintKey } from "../../lib/theme";
+import { LinearGradient } from "expo-linear-gradient";
+import FadeInView from "../../components/FadeInView";
+import AnimatedPressable from "../../components/AnimatedPressable";
+
+// Shared components
+import SectionHeader from "../../components/SectionHeader";
+import MetricCard from "../../components/MetricCard";
+import SessionCard from "../../components/SessionCard";
+import RecommendationQueue, { Recommendation } from "../../components/RecommendationQueue";
+import EmptyState from "../../components/EmptyState";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type ReportStatus = "Passed" | "Needs Improvement";
-type RecentReport = { id: string; session_id: string; date: string; instructor: string; score: number; status: ReportStatus };
-type FeedbackArea  = { id: string; title: string; score: number; hint: string; icon: string };
-type CommentItem   = { id: string; date: string; text: string; rating: number };
-type Achievement   = { id: string; title: string; subtitle: string; icon: string; earned: boolean };
+type CommentItem = { id: string; date: string; text: string; rating: number };
+type Achievement = { id: string; title: string; subtitle: string; icon: string; earned: boolean };
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -22,20 +29,19 @@ export default function Dashboard() {
   const { width } = useWindowDimensions();
   const isWide = width >= 900;
 
-  const [loading, setLoading]           = useState(true);
-  const [dash, setDash]                 = useState<any>(null);
-  const [storedName, setStoredName]     = useState("");
+  const [loading, setLoading]             = useState(true);
+  const [dash, setDash]                   = useState<any>(null);
+  const [storedName, setStoredName]       = useState("");
   const [manageBooking, setManageBooking] = useState<any>(null);
-  const [cancelledIds, setCancelledIds] = useState<Set<string>>(new Set());
-  const [toast, setToast]               = useState<string | null>(null);
+  const [cancelledIds, setCancelledIds]   = useState<Set<string>>(new Set());
+  const [toast, setToast]                 = useState<string | null>(null);
+  const [showAllComments, setShowAllComments] = useState(false);
 
   async function loadDashboard() {
     try {
       setLoading(true);
-      // Load stored name as immediate fallback while API loads
       const name = await AsyncStorage.getItem("driveiq_user_name");
       if (name) setStoredName(name);
-
       const data = await apiGet("/dashboard/trainee");
       setDash(data);
     } catch {
@@ -54,13 +60,9 @@ export default function Dashboard() {
     if (!manageBooking) return;
     const bookingId = manageBooking.booking_id;
     if (!bookingId) { showToast("Missing booking ID"); return; }
-
-    // Optimistic: close modal + remove from list immediately
     setManageBooking(null);
     setCancelledIds((prev) => new Set([...prev, bookingId]));
     showToast("Booking cancelled");
-
-    // Fire API in background; roll back if it fails
     try {
       await apiDelete(`/bookings/${bookingId}`);
     } catch (e: any) {
@@ -72,30 +74,25 @@ export default function Dashboard() {
   useEffect(() => { loadDashboard(); }, []);
   useFocusEffect(useCallback(() => { loadDashboard(); }, []));
 
-  // ── Data derivations — no hardcoded names or placeholder data ─────────────
+  // ── Data derivations ─────────────────────────────────────────────────────
   const studentName        = dash?.welcome?.name || storedName || "";
   const sessionsCompleted  = dash?.progress?.sessions_completed ?? 0;
   const sessionsTotal      = dash?.progress?.target_sessions ?? 0;
-  const completedPct       = sessionsTotal > 0 ? Math.round((sessionsCompleted / sessionsTotal) * 100) : 0;
   const currentDrivingScore= dash?.progress?.current_score ?? 0;
   const scoreLabel         = dash?.welcome?.badge ?? "—";
   const goalText           = dash?.progress?.goal_text ?? "Complete sessions to unlock your next badge";
-  const instructorName     = dash?.link?.instructor?.name ?? dash?.link?.instructor?.instructor_name ?? "—";
 
   const upcomingList = useMemo(() => {
-    // Prefer the new list field; fall back to the single-item field for old API
     const list: any[] = Array.isArray(dash?.upcoming_sessions)
       ? dash.upcoming_sessions
-      : dash?.upcoming_session
-      ? [dash.upcoming_session]
-      : [];
+      : dash?.upcoming_session ? [dash.upcoming_session] : [];
     return list
       .filter((u: any) => !cancelledIds.has(u?.booking_id))
       .map((u: any) => {
-        const dateISO   = u?.dateISO || u?.date_iso || u?.date || "";
-        const dateLabel = u?.dateLabel || u?.date_label || (dateISO ? new Date(dateISO).toLocaleDateString() : "—");
-        const timeLabel = u?.timeLabel || u?.time_label || u?.time || "—";
-        const instructor= u?.instructor || u?.instructor_name || "—";
+        const dateISO    = u?.dateISO || u?.date_iso || u?.date || "";
+        const dateLabel  = u?.dateLabel || u?.date_label || (dateISO ? new Date(dateISO).toLocaleDateString() : "—");
+        const timeLabel  = u?.timeLabel || u?.time_label || u?.time || "—";
+        const instructor = u?.instructor || u?.instructor_name || "—";
         return { booking_id: u?.booking_id, dateISO, dateLabel, timeLabel, instructor };
       });
   }, [dash, cancelledIds]);
@@ -107,62 +104,67 @@ export default function Dashboard() {
     const ms   = d.getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     const days = Math.round(ms / (1000 * 60 * 60 * 24));
     if (Number.isNaN(days)) return "—";
-    if (days > 1)  return `${days} days away`;
+    if (days > 1) return `${days} days away`;
     if (days === 1) return "Tomorrow";
     if (days === 0) return "Today";
     return "Session passed";
   }
 
-  // Only show real reports from the API — no hardcoded fallback data
-  const reports: RecentReport[] = useMemo(() => {
+  // Recent reports for SessionCard
+  const recentReports = useMemo(() => {
     const list = Array.isArray(dash?.recent_reports) ? dash.recent_reports : [];
     return list.map((r: any, idx: number) => {
-      const score    = r?.score?.overall ?? r?.score ?? 0;
-      const status: ReportStatus = score >= 70 ? "Passed" : "Needs Improvement";
-      const date     = r?.date_label || r?.date || (r?.created_at ? new Date(r.created_at).toLocaleDateString() : "—");
-      const instructor = r?.instructor_name || r?.instructor || instructorName || "—";
-      return { id: r?.id || r?._id || r?.trip_id || `rep-${idx}`, session_id: r?.session_id || "", date, instructor, score, status };
+      const score = r?.score?.overall ?? r?.score ?? 0;
+      const date  = r?.date_label || r?.date || (r?.created_at ? new Date(r.created_at).toLocaleDateString() : "—");
+      const instructor = r?.instructor_name || r?.instructor || "—";
+      return {
+        id: r?.id || r?._id || `rep-${idx}`,
+        session_id: r?.session_id || "",
+        date,
+        instructor,
+        score,
+        passed: score >= 70,
+      };
     });
-  }, [dash, instructorName]);
+  }, [dash]);
 
-  // Only show real feedback from the API — no hardcoded fallback data
-  const feedback: FeedbackArea[] = useMemo(() => {
+  // AI feedback as recommendations
+  const recommendations: Recommendation[] = useMemo(() => {
     const list = Array.isArray(dash?.ai_feedback) ? dash.ai_feedback : [];
     return list.map((f: any, idx: number) => ({
-      id:    f?.id || `f-${idx}`,
+      id: f?.id || `f-${idx}`,
+      icon: f?.icon || "💡",
       title: f?.title || f?.area || "Tip",
-      score: typeof f?.score === "number" ? f.score : 0,
-      hint:  f?.message || f?.hint || "",
-      icon:  f?.icon || "💡",
+      message: f?.message || f?.hint || "",
+      score: typeof f?.score === "number" ? f.score : undefined,
+      priority: (f?.priority as "high" | "medium" | "low") ?? "medium",
     }));
   }, [dash]);
 
-  // Only show real comments from the API — no hardcoded fallback data
+  // Comments
   const comments: CommentItem[] = useMemo(() => {
     const list = Array.isArray(dash?.instructor_comments) ? dash.instructor_comments : [];
     return list.map((c: any, idx: number) => ({
-      id:     c?.id || `c-${idx}`,
-      date:   c?.date ?? (c?.created_at ? new Date(c.created_at).toLocaleDateString() : "—"),
-      text:   c?.text || c?.comment || "",
+      id: c?.id || `c-${idx}`,
+      date: c?.date ?? (c?.created_at ? new Date(c.created_at).toLocaleDateString() : "—"),
+      text: c?.text || c?.comment || "",
       rating: c?.rating ?? 0,
     }));
   }, [dash]);
 
-  // Only show real achievements from the API — no hardcoded fallback data
+  // Achievements
   const achievements: Achievement[] = useMemo(() => {
     const list = Array.isArray(dash?.achievements) ? dash.achievements : [];
     return list.map((a: any, idx: number) => ({
-      id:       a?.id || `a-${idx}`,
-      title:    a?.title || "Achievement",
+      id: a?.id || `a-${idx}`,
+      title: a?.title || "Achievement",
       subtitle: a?.subtitle || a?.desc || "",
-      icon:     a?.icon || "🏅",
-      earned:   !!a?.earned,
+      icon: a?.icon || "🏅",
+      earned: !!a?.earned,
     }));
   }, [dash]);
 
-  const scoreBadgeColor =
-    currentDrivingScore >= 85 ? colors.green :
-    currentDrivingScore >= 70 ? colors.blue  : colors.redDark;
+  const scoreTint: TintKey = currentDrivingScore >= 80 ? "green" : currentDrivingScore >= 60 ? "yellow" : "red";
 
   if (loading) {
     return (
@@ -173,76 +175,67 @@ export default function Dashboard() {
     );
   }
 
+  const visibleComments = showAllComments ? comments : comments.slice(0, 3);
+
   return (
     <View style={{ flex: 1 }}>
     <ScrollView style={s.page} contentContainerStyle={s.content}>
 
       {/* ── 1. Hero ───────────────────────────────────────────────────────── */}
-      <View style={s.hero}>
+      <FadeInView delay={0}>
+      <LinearGradient colors={[colors.purpleDark, "#4C1D95"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.hero}>
         <View style={{ flex: 1 }}>
           <Text style={s.heroHello}>
             {studentName ? `Hello, ${studentName} 👋` : "Welcome back 👋"}
           </Text>
           <Text style={s.heroSub}>Great to see you back! Let's keep improving your driving skills.</Text>
         </View>
-        <View style={s.heroIconBubble}><Text style={s.heroIconText}>🚗</Text></View>
+      </LinearGradient>
+      </FadeInView>
+
+      {/* ── 2. KPI Strip ──────────────────────────────────────────────────── */}
+      <FadeInView delay={80}>
+      <View style={s.kpiStrip}>
+        <MetricCard
+          label="Driving Score"
+          value={currentDrivingScore > 0 ? `${currentDrivingScore}%` : "—"}
+          icon="🎯"
+          tintKey={scoreTint}
+          subtitle={scoreLabel !== "—" ? scoreLabel : undefined}
+        />
+        <MetricCard
+          label="Sessions"
+          value={sessionsTotal > 0 ? `${sessionsCompleted}/${sessionsTotal}` : `${sessionsCompleted}`}
+          icon="📊"
+          tintKey="blue"
+          subtitle={sessionsTotal > 0 ? `${Math.max(0, sessionsTotal - sessionsCompleted)} remaining` : undefined}
+        />
+        <MetricCard
+          label="Safety Badge"
+          value={scoreLabel}
+          icon="🛡️"
+          tintKey="purple"
+        />
+        <MetricCard
+          label="Next Goal"
+          value="🎯"
+          icon="🏆"
+          tintKey="yellow"
+          subtitle={goalText}
+        />
       </View>
+      </FadeInView>
 
-      {/* ── 2. Progress ──────────────────────────────────────────────────── */}
+      {/* ── 3. Next Session (promoted above fold) ──────────────────────── */}
+      <FadeInView delay={160}>
       <View style={card.base}>
-        <SectionHeader icon="🏆" iconBg={colors.yellowBg} label="Your Progress" />
-
-        <View style={[s.progressGrid, isWide && { flexDirection: "row" }]}>
-          {/* Sessions */}
-          <View style={[s.progressItem, isWide && { flex: 1 }]}>
-            <View style={s.progressLabelRow}>
-              <Text style={s.progressLabel}>Sessions Completed</Text>
-              <Text style={s.progressMeta}>
-                {sessionsTotal > 0 ? `${sessionsCompleted}/${sessionsTotal}` : `${sessionsCompleted}`}
-              </Text>
-            </View>
-            <ProgressBar pct={completedPct} color={colors.purpleDark} />
-            <Text style={s.progressHint}>
-              {sessionsTotal > 0 ? `${Math.max(0, sessionsTotal - sessionsCompleted)} sessions remaining` : "No sessions yet"}
-            </Text>
-          </View>
-
-          {/* Score */}
-          <View style={[s.progressItem, isWide && { flex: 1 }]}>
-            <View style={s.progressLabelRow}>
-              <Text style={s.progressLabel}>Current Driving Score</Text>
-              <View style={s.scoreBadgeRow}>
-                <Text style={s.scoreBig}>{currentDrivingScore > 0 ? `${currentDrivingScore}%` : "—"}</Text>
-                {scoreLabel !== "—" && (
-                  <View style={[s.scoreBadge, { backgroundColor: scoreBadgeColor }]}>
-                    <Text style={s.scoreBadgeText}>{scoreLabel}</Text>
-                  </View>
-                )}
-              </View>
-            </View>
-            <ProgressBar pct={Math.min(100, Math.max(0, currentDrivingScore))} color={scoreBadgeColor} />
-          </View>
-
-          {/* Goal */}
-          <View style={[s.goalBox, isWide && { flex: 1 }]}>
-            <View style={s.goalIconWrap}><Text style={{ fontSize: 18 }}>🎯</Text></View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.goalTitle}>Next Goal</Text>
-              <Text style={s.goalText}>{goalText}</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Upcoming sessions */}
-        <View style={divider.base} />
-        <SectionHeader icon="🗓️" iconBg={colors.greenBorderAlt} label={`Upcoming Sessions${upcomingList.length > 0 ? ` (${upcomingList.length})` : ""}`} />
-
+        <SectionHeader icon="🗓️" iconBg={colors.greenBorderAlt} label="Upcoming Sessions" count={upcomingList.length > 0 ? upcomingList.length : undefined} />
         {upcomingList.length === 0 ? (
           <View style={s.emptyBox}>
             <Text style={s.emptyText}>No upcoming sessions scheduled.</Text>
-            <Pressable onPress={() => router.navigate("/(studenttabs)/sessions" as any)} style={[s.outlineBtn, { marginTop: 0 }]}>
+            <AnimatedPressable onPress={() => router.navigate("/(studenttabs)/sessions" as any)} style={[s.outlineBtn, { marginTop: 0 }]}>
               <Text style={s.outlineBtnText}>Book a Session</Text>
-            </Pressable>
+            </AnimatedPressable>
           </View>
         ) : (
           <View style={{ gap: 10, marginTop: 10 }}>
@@ -255,101 +248,67 @@ export default function Dashboard() {
                 </View>
                 <View style={s.countdownRow}>
                   <Text style={s.countdownText}>🕒 {countdownFor(u.dateISO)}</Text>
-                  <Pressable
+                  <AnimatedPressable
                     onPress={() => setManageBooking(u)}
-                    style={({ pressed }) => [s.outlineBtn, { marginTop: 0 }, pressed && { opacity: 0.8 }]}
+                    style={[s.outlineBtn, { marginTop: 0 }]}
                   >
                     <Text style={s.outlineBtnText}>Manage →</Text>
-                  </Pressable>
+                  </AnimatedPressable>
                 </View>
               </View>
             ))}
           </View>
         )}
       </View>
+      </FadeInView>
 
-      {/* ── 3. Reports + AI Feedback ─────────────────────────────────────── */}
-      <View style={[s.twoCol, isWide && { flexDirection: "row" }]}>
-
-        {/* Recent Reports */}
-        <View style={[card.base, isWide && { flex: 1 }]}>
-          <SectionHeader icon="📄" iconBg={colors.blueLighter} label="Recent Reports" />
-          {reports.length === 0 ? (
-            <EmptyState text="No reports yet. Complete a session to see your results." />
-          ) : (
-            <View style={{ marginTop: 12, gap: 10 }}>
-              {reports.map((r) => (
-                <View key={r.id} style={s.reportCard}>
-                  <View style={s.reportTop}>
-                    <View>
-                      <Text style={s.reportDate}>{r.date}</Text>
-                      <Text style={s.reportSub}>Instructor: {r.instructor}</Text>
-                    </View>
-                    <View style={r.status === "Passed" ? s.statusPassed : s.statusNeeds}>
-                      <Text style={[s.statusText, r.status === "Passed" ? s.statusPassedText : s.statusNeedsText]}>
-                        {r.status === "Passed" ? "✓ Passed" : "Needs Work"}
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={s.reportBottom}>
-                    <Text style={s.reportScoreLabel}>
-                      Score: <Text style={[s.reportScoreValue, { color: r.score >= 70 ? colors.green : colors.redDark }]}>{r.score}%</Text>
-                    </Text>
-                    <Pressable
-                      onPress={() => router.push({
-                        pathname: "/(studenttabs)/session-report",
-                        params: { sessionId: r.session_id, from: "dashboard" },
-                      })}
-                      style={({ pressed }) => [s.outlineBtn, { marginTop: 0, paddingHorizontal: 12, paddingVertical: 8 }, pressed && { opacity: 0.8 }]}
-                    >
-                      <Text style={s.outlineBtnText}>View Report →</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              ))}
-            </View>
-          )}
-        </View>
-
-        {/* AI Feedback */}
-        <View style={[card.base, isWide && { flex: 1 }]}>
-          <SectionHeader icon="💡" iconBg="#FEF9C3" label="AI Feedback" />
-          {feedback.length === 0 ? (
-            <EmptyState text="AI feedback will appear after your first session." />
-          ) : (
-            <>
-              <View style={{ marginTop: 12, gap: 16 }}>
-                {feedback.map((f) => (
-                  <View key={f.id}>
-                    <View style={s.fbRow}>
-                      <View style={s.fbLeft}>
-                        <Text style={{ fontSize: 14 }}>{f.icon}</Text>
-                        <Text style={s.fbTitle}>{f.title}</Text>
-                      </View>
-                      <Text style={s.fbPct}>{f.score}%</Text>
-                    </View>
-                    <ProgressBar pct={Math.min(100, Math.max(0, f.score))} color={colors.purpleDark} />
-                    <Text style={s.fbHint}>"{f.hint}"</Text>
-                  </View>
-                ))}
-              </View>
-              <View style={s.tipBox}>
-                <Text style={s.tipText}>💡 Focus on your lowest-scoring areas to see the biggest improvements!</Text>
-              </View>
-            </>
-          )}
-        </View>
-      </View>
-
-      {/* ── 4. Instructor Comments ────────────────────────────────────────── */}
+      {/* ── 4. Recent Sessions ─────────────────────────────────────────── */}
+      <FadeInView delay={240}>
       <View style={card.base}>
-        <SectionHeader icon="💬" iconBg={colors.purpleBorder} label="Instructor Comments" />
-        {comments.length === 0 ? (
-          <EmptyState text="Instructor comments will appear after your sessions." />
+        <SectionHeader icon="📄" iconBg={colors.blueLighter} label="Recent Reports" />
+        {recentReports.length === 0 ? (
+          <View style={s.inlineEmpty}>
+            <Text style={s.inlineEmptyText}>No reports yet. Complete a session to see your results.</Text>
+          </View>
         ) : (
-          <View style={[s.commentsGrid, isWide && { flexDirection: "row" }]}>
-            {comments.map((c) => (
-              <View key={c.id} style={[s.commentCard, isWide && { flex: 1 }]}>
+          <View style={s.recentGrid}>
+            {recentReports.slice(0, 4).map((r: any) => (
+              <SessionCard
+                key={r.id}
+                sessionId={r.session_id}
+                date={r.date}
+                performanceScore={r.score}
+                passed={r.passed}
+                instructorName={r.instructor}
+                variant="compact"
+                onPress={() => router.push({
+                  pathname: "/(studenttabs)/session-report",
+                  params: { sessionId: r.session_id, from: "dashboard" },
+                })}
+              />
+            ))}
+          </View>
+        )}
+      </View>
+      </FadeInView>
+
+      {/* ── 5. AI Insights ─────────────────────────────────────────────── */}
+      {recommendations.length > 0 && (
+        <FadeInView delay={320}>
+        <View style={card.base}>
+          <SectionHeader icon="💡" iconBg={tint.amber.bg} label="AI Insights" />
+          <RecommendationQueue items={recommendations} maxVisible={3} />
+        </View>
+        </FadeInView>
+      )}
+
+      {/* ── 6. Instructor Comments ─────────────────────────────────────── */}
+      {comments.length > 0 && (
+        <View style={card.base}>
+          <SectionHeader icon="💬" iconBg={colors.purpleBorder} label="Instructor Comments" count={comments.length} />
+          <View style={s.commentsGrid}>
+            {visibleComments.map((c) => (
+              <View key={c.id} style={s.commentCard}>
                 <View style={s.commentTop}>
                   <Text style={s.commentDate}>{c.date}</Text>
                   {c.rating > 0 && (
@@ -363,41 +322,40 @@ export default function Dashboard() {
               </View>
             ))}
           </View>
-        )}
-      </View>
+          {comments.length > 3 && (
+            <Pressable onPress={() => setShowAllComments(!showAllComments)} style={({ pressed }) => [s.showMoreBtn, pressed && { opacity: 0.7 }]}>
+              <Text style={s.showMoreText}>
+                {showAllComments ? "Show less" : `Show ${comments.length - 3} more`}
+              </Text>
+            </Pressable>
+          )}
+        </View>
+      )}
 
-      {/* ── 5. Achievements ──────────────────────────────────────────────── */}
-      <View style={card.base}>
-        <SectionHeader icon="🏅" iconBg={colors.yellowBg} label="Achievements & Milestones" />
-        {achievements.length === 0 ? (
-          <EmptyState text="Complete sessions to start earning achievements." />
-        ) : (
-          <>
-            <View style={[s.achGrid, isWide && { flexDirection: "row" }]}>
-              {achievements.map((a) => (
-                <View key={a.id} style={[s.achCard, isWide && { flex: 1 }, a.earned ? s.achEarned : s.achLocked]}>
-                  <Text style={s.achIcon}>{a.icon}</Text>
-                  <Text style={s.achTitle}>{a.title}</Text>
-                  <Text style={s.achSub}>{a.subtitle}</Text>
-                  <View style={[s.earnedPill, a.earned ? s.earnedOn : s.earnedOff]}>
-                    <Text style={[s.earnedText, a.earned ? s.earnedTextOn : s.earnedTextOff]}>
-                      {a.earned ? "✓ Earned" : "Locked"}
-                    </Text>
-                  </View>
+      {/* ── 7. Achievements ────────────────────────────────────────────── */}
+      {achievements.length > 0 && (
+        <View style={card.base}>
+          <SectionHeader icon="🏅" iconBg={colors.yellowBg} label="Achievements & Milestones" />
+          <View style={[s.achGrid, isWide && { flexDirection: "row" }]}>
+            {achievements.map((a) => (
+              <View key={a.id} style={[s.achCard, isWide && { flex: 1 }, a.earned ? s.achEarned : s.achLocked]}>
+                <Text style={s.achIcon}>{a.icon}</Text>
+                <Text style={s.achTitle}>{a.title}</Text>
+                <Text style={s.achSub}>{a.subtitle}</Text>
+                <View style={[s.earnedPill, a.earned ? s.earnedOn : s.earnedOff]}>
+                  <Text style={[s.earnedText, a.earned ? s.earnedTextOn : s.earnedTextOff]}>
+                    {a.earned ? "✓ Earned" : "Locked"}
+                  </Text>
                 </View>
-              ))}
-            </View>
-            <View style={s.motivationBanner}>
-              <Text style={s.motivationEmoji}>🎉</Text>
-              <Text style={s.motivationText}>You're on track to pass — keep practicing!</Text>
-            </View>
-          </>
-        )}
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
 
-        <Pressable onPress={loadDashboard} style={({ pressed }) => [s.outlineBtn, pressed && { opacity: 0.8 }]}>
-          <Text style={s.outlineBtnText}>↻ Refresh</Text>
-        </Pressable>
-      </View>
+      <AnimatedPressable onPress={loadDashboard} style={s.outlineBtn}>
+        <Text style={s.outlineBtnText}>↻ Refresh</Text>
+      </AnimatedPressable>
 
       <Text style={s.footer}>© 2025 DriveIQ · Student Portal</Text>
     </ScrollView>
@@ -419,7 +377,6 @@ export default function Dashboard() {
               <Text style={s.manageClose}>✕</Text>
             </Pressable>
           </View>
-
           {manageBooking && (
             <>
               <InfoPill label="Date"       value={manageBooking.dateLabel}  icon="🗓️" bg={tint.indigo.bg}  border={tint.indigo.border}  />
@@ -427,15 +384,11 @@ export default function Dashboard() {
               <InfoPill label="Time"       value={manageBooking.timeLabel}  icon="🕑" bg={tint.purple.bg}  border={tint.purple.border}  />
               <View style={{ height: 10 }} />
               <InfoPill label="Instructor" value={manageBooking.instructor} icon="👤" bg={tint.green.bg}   border={tint.green.border}   />
-
               <Text style={s.manageCountdown}>🕒 {countdownFor(manageBooking.dateISO)}</Text>
-
               <View style={s.manageDivider} />
-
               <Pressable onPress={requestCancel} style={s.cancelReqBtn}>
                 <Text style={s.cancelReqText}>Request Cancellation</Text>
               </Pressable>
-
               <Pressable onPress={() => setManageBooking(null)} style={s.manageCloseBtn}>
                 <Text style={s.manageCloseBtnText}>Close</Text>
               </Pressable>
@@ -449,37 +402,6 @@ export default function Dashboard() {
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
-
-function SectionHeader({ icon, iconBg, label }: { icon: string; iconBg: string; label: string }) {
-  return (
-    <View style={sh.row}>
-      <View style={[sh.iconWrap, { backgroundColor: iconBg }]}>
-        <Text style={sh.iconText}>{icon}</Text>
-      </View>
-      <Text style={sh.label}>{label}</Text>
-    </View>
-  );
-}
-
-const sh = StyleSheet.create({
-  row:     { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 4 },
-  iconWrap:{ width: 34, height: 34, borderRadius: radius.md, alignItems: "center", justifyContent: "center" },
-  iconText:{ fontSize: 16 },
-  label:   { ...type_.cardTitle },
-});
-
-function ProgressBar({ pct, color }: { pct: number; color: string }) {
-  return (
-    <View style={pb.track}>
-      <View style={[pb.fill, { width: `${pct}%` as any, backgroundColor: color }]} />
-    </View>
-  );
-}
-
-const pb = StyleSheet.create({
-  track: { height: 8, borderRadius: radius.pill, backgroundColor: colors.borderFaint, overflow: "hidden", marginVertical: 6 },
-  fill:  { height: "100%", borderRadius: radius.pill },
-});
 
 function InfoPill({ label, value, icon, bg, border }: { label: string; value: string; icon: string; bg: string; border: string }) {
   return (
@@ -502,14 +424,6 @@ const ip = StyleSheet.create({
   value:   { ...type_.metaValue },
 });
 
-function EmptyState({ text }: { text: string }) {
-  return (
-    <View style={{ marginTop: 12, padding: 16, backgroundColor: colors.pageBg, borderRadius: radius.input, alignItems: "center" }}>
-      <Text style={{ fontSize: 12, fontWeight: "700", color: colors.subtext, textAlign: "center" }}>{text}</Text>
-    </View>
-  );
-}
-
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
@@ -518,91 +432,69 @@ const s = StyleSheet.create({
   center:  { flex: 1, alignItems: "center", justifyContent: "center", padding: space.xxl },
 
   // Hero
-  hero:          { borderRadius: radius.cardXl, padding: space.xl, backgroundColor: colors.purpleDark, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomColor: colors.purpleDeep, borderBottomWidth: 2 },
-  heroHello:     { color: "#FFFFFF", fontWeight: "900", fontSize: 15 },
-  heroSub:       { color: "rgba(255,255,255,0.82)", fontWeight: "700", fontSize: 12, marginTop: 6, maxWidth: 280 },
-  heroIconBubble:{ width: 58, height: 58, borderRadius: 29, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" },
-  heroIconText:  { fontSize: 26 },
+  hero:          { borderRadius: radius.cardXl, padding: space.xl, backgroundColor: colors.purpleDark, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomColor: colors.purpleDeep, borderBottomWidth: 2, ...shadow.cardRaised },
+  heroHello:     { color: "#FFFFFF", fontSize: 16, fontFamily: fonts.bold },
+  heroSub:       { color: "rgba(255,255,255,0.82)", fontSize: 12, marginTop: 6, maxWidth: 280, fontFamily: fonts.medium },
 
-  // Progress
-  progressGrid:    { flexDirection: "column", gap: 16, marginTop: 12 },
-  progressItem:    { gap: 2 },
-  progressLabelRow:{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  progressLabel:   { ...type_.body, color: colors.label },
-  progressMeta:    { ...type_.metaValue },
-  progressHint:    { ...type_.bodySm },
+  // KPI Strip
+  kpiStrip: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
 
-  scoreBadgeRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  scoreBig:      { ...type_.scoreValue },
-  scoreBadge:    { borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 },
-  scoreBadgeText:{ color: "#FFFFFF", fontWeight: "900", fontSize: 11 },
-
-  goalBox:     { flexDirection: "row", alignItems: "center", gap: 12, borderRadius: radius.input, borderWidth: 1, borderColor: colors.blueChip, backgroundColor: colors.blueLight, padding: space.md, marginTop: 4 },
-  goalIconWrap:{ width: 40, height: 40, borderRadius: radius.input, borderWidth: 1, borderColor: colors.blueBorder, backgroundColor: colors.blueLighter, alignItems: "center", justifyContent: "center" },
-  goalTitle:   { fontSize: 12, fontWeight: "900", color: colors.blueDark },
-  goalText:    { fontSize: 11, fontWeight: "700", color: colors.blueDeep, marginTop: 3 },
-
+  // Upcoming
   upcomingCard:  { borderWidth: 1, borderColor: colors.border, borderRadius: radius.input, padding: space.md, backgroundColor: colors.cardBg, gap: 10 },
   upcomingRow:   { flexDirection: "column", gap: 10 },
   countdownRow:  { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 14 },
-  countdownText: { fontSize: 12, fontWeight: "900", color: colors.blue },
+  countdownText: { fontSize: 12, color: colors.blue, fontFamily: fonts.extrabold },
   emptyBox:      { marginTop: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: space.md, backgroundColor: colors.pageBg, borderRadius: radius.input },
-  emptyText:     { fontSize: 12, fontWeight: "700", color: colors.subtext, flex: 1 },
+  emptyText:     { fontSize: 12, color: colors.subtext, flex: 1, fontFamily: fonts.bold },
 
-  twoCol: { flexDirection: "column", gap: 14 },
-
-  // Reports
-  reportCard:      { borderRadius: radius.input, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.pageBg, padding: space.md },
-  reportTop:       { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" },
-  reportDate:      { ...type_.body, color: colors.textAlt, fontWeight: "900" },
-  reportSub:       { ...type_.bodySm, marginTop: 4 },
-  reportBottom:    { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 10 },
-  reportScoreLabel:{ fontSize: 12, fontWeight: "800", color: colors.label },
-  reportScoreValue:{ fontWeight: "900", fontSize: 13 },
-
-  statusPill:      { borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 5 },
-  statusPassed:    { backgroundColor: "#DCFCE7", borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 5 },
-  statusNeeds:     { backgroundColor: colors.redLight, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 5 },
-  statusText:      { fontSize: 11, fontWeight: "900" },
-  statusPassedText:{ color: colors.green },
-  statusNeedsText: { color: colors.redDark },
-
-  // AI Feedback
-  fbRow:   { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  fbLeft:  { flexDirection: "row", alignItems: "center", gap: 8 },
-  fbTitle: { ...type_.body, fontWeight: "900", color: colors.textAlt },
-  fbPct:   { fontSize: 12, fontWeight: "900", color: colors.purpleDark },
-  fbHint:  { ...type_.bodySm, fontStyle: "italic" },
-  tipBox:  { borderRadius: radius.input, borderWidth: 1, borderColor: colors.blueBorder, backgroundColor: "#EFF6FF", padding: space.md, marginTop: 8 },
-  tipText: { fontSize: 12, fontWeight: "800", color: colors.blueDark },
+  // Recent sessions grid
+  recentGrid: {
+    marginTop: 12,
+    gap: 10,
+  },
+  inlineEmpty: {
+    marginTop: 12,
+    padding: 16,
+    backgroundColor: colors.pageBg,
+    borderRadius: radius.input,
+    alignItems: "center",
+  },
+  inlineEmptyText: {
+    fontSize: 12,
+    color: colors.subtext,
+    textAlign: "center",
+    fontFamily: fonts.bold,
+  },
 
   // Comments
   commentsGrid: { flexDirection: "column", gap: 12, marginTop: 12 },
   commentCard:  { borderRadius: radius.input, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.pageBg, padding: space.md },
   commentTop:   { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  commentDate:  { fontSize: 12, fontWeight: "900", color: colors.purpleDark },
+  commentDate:  { fontSize: 12, color: colors.purpleDark, fontFamily: fonts.bold },
   ratingRow:    { flexDirection: "row", alignItems: "center", gap: 4 },
-  ratingText:   { ...type_.body, fontWeight: "900", color: colors.textAlt },
-  commentText:  { ...type_.bodyMedium, color: colors.label, marginTop: 10 },
+  ratingText:   { ...type_.body, color: colors.textAlt, fontFamily: fonts.extrabold },
+  commentText:  { ...type_.body, color: colors.label, marginTop: 10 },
+  showMoreBtn:  { alignItems: "center", paddingVertical: 10, marginTop: 4 },
+  showMoreText: { fontSize: 12, color: colors.blue, fontFamily: fonts.bold },
 
   // Achievements
   achGrid:     { flexDirection: "column", gap: 10, marginTop: 12 },
   achCard:     { borderRadius: radius.card, borderWidth: 1, padding: 14, alignItems: "center" },
   achEarned:   { backgroundColor: colors.yellowLight, borderColor: colors.yellowBorder },
   achLocked:   { backgroundColor: colors.pageBg, borderColor: colors.border },
-  achIcon:     { fontSize: 28 },
-  achTitle:    { ...type_.body, fontWeight: "900", color: colors.textAlt, marginTop: 10 },
+  achIcon:     { fontSize: 32 },
+  achTitle:    { ...type_.body, color: colors.textAlt, marginTop: 10, fontFamily: fonts.bold },
   achSub:      { ...type_.bodySm, textAlign: "center", marginTop: 6 },
   earnedPill:  { marginTop: 10, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 5 },
   earnedOn:    { backgroundColor: colors.purpleDark },
   earnedOff:   { backgroundColor: colors.borderMid },
-  earnedText:  { fontSize: 11, fontWeight: "900" },
+  earnedText:  { fontSize: 11, fontFamily: fonts.extrabold },
   earnedTextOn:{ color: "#FFFFFF" },
   earnedTextOff:{ color: colors.subtextAlt },
-
-  motivationBanner: { marginTop: 16, borderRadius: radius.card, borderWidth: 1, borderColor: colors.greenBorder, backgroundColor: colors.greenLighter, padding: space.lg, alignItems: "center", gap: 6 },
-  motivationEmoji:  { fontSize: 24 },
-  motivationText:   { fontSize: 13, fontWeight: "900", color: colors.greenDark, textAlign: "center" },
 
   // Buttons
   outlineBtn:     { marginTop: 10, borderRadius: radius.input, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.cardBg, paddingVertical: 10, paddingHorizontal: space.lg, alignItems: "center", justifyContent: "center" },
@@ -614,16 +506,16 @@ const s = StyleSheet.create({
   manageOverlay:      { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", padding: 24 },
   manageCard:         { backgroundColor: colors.cardBg, borderRadius: radius.cardXl, padding: 24 },
   manageHeader:       { flexDirection: "row" as any, alignItems: "center" as any, justifyContent: "space-between" as any, marginBottom: 20 },
-  manageTitle:        { fontWeight: "900" as any, fontSize: 18, color: colors.textAlt },
+  manageTitle:        { fontSize: 18, color: colors.textAlt, fontFamily: fonts.extrabold },
   manageClose:        { fontSize: 22, color: colors.subtext, padding: 4 },
-  manageCountdown:    { fontSize: 13, fontWeight: "900" as any, color: colors.blue, marginTop: 14 },
+  manageCountdown:    { fontSize: 13, color: colors.blue, marginTop: 14, fontFamily: fonts.extrabold },
   manageDivider:      { height: 1, backgroundColor: colors.border, marginVertical: 16 },
   cancelReqBtn:       { backgroundColor: colors.redDark, borderRadius: radius.input, paddingVertical: 14, alignItems: "center" as any, marginBottom: 10 },
-  cancelReqText:      { color: "#FFF", fontWeight: "900" as any, fontSize: 14 },
+  cancelReqText:      { color: "#FFF", fontSize: 14, fontFamily: fonts.extrabold },
   manageCloseBtn:     { borderWidth: 1, borderColor: colors.border, borderRadius: radius.input, paddingVertical: 12, alignItems: "center" as any },
-  manageCloseBtnText: { fontWeight: "900" as any, fontSize: 13, color: colors.textAlt },
+  manageCloseBtnText: { fontSize: 13, color: colors.textAlt, fontFamily: fonts.extrabold },
 
   // Toast
-  toast:     { position: "absolute" as any, bottom: 40, alignSelf: "center" as any, backgroundColor: "#1F2937", borderRadius: 999, paddingHorizontal: 20, paddingVertical: 10, zIndex: 9999 },
-  toastText: { color: "#FFF", fontWeight: "700" as any, fontSize: 13 },
+  toast:     { position: "absolute" as any, bottom: 40, alignSelf: "center" as any, backgroundColor: colors.toast, borderRadius: 999, paddingHorizontal: 20, paddingVertical: 10, zIndex: 9999 },
+  toastText: { color: "#FFF", fontSize: 13, fontFamily: fonts.bold },
 });

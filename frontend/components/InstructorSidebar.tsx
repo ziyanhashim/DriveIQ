@@ -3,6 +3,7 @@ import {
   View, Text, TextInput, StyleSheet, Pressable, ScrollView, ActivityIndicator,
 } from "react-native";
 import { apiGet } from "../lib/api";
+import { fonts } from "../lib/theme";
 
 type StudentStatus = "Active" | "Scheduled" | "Learner";
 
@@ -199,11 +200,11 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 14,
   },
-  sidebarTitle: { color: "#101828", fontWeight: "900", fontSize: 13, marginBottom: 10 },
+  sidebarTitle: { color: "#101828", fontFamily: fonts.extrabold, fontSize: 13, marginBottom: 10 },
 
   block:      { marginTop: 12 },
-  blockTitle: { color: "#101828", fontWeight: "900", fontSize: 13 },
-  empty:      { marginTop: 12, fontSize: 12, fontWeight: "700", color: "#98A2B3" },
+  blockTitle: { color: "#101828", fontFamily: fonts.extrabold, fontSize: 13 },
+  empty:      { marginTop: 12, fontSize: 12, fontFamily: fonts.bold, color: "#98A2B3" },
 
   searchWrap: {
     marginTop: 10,
@@ -230,10 +231,10 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   avatar:        { width: 40, height: 40, borderRadius: 20, backgroundColor: "#EEF2FF", alignItems: "center", justifyContent: "center", marginRight: 10 },
-  avatarText:    { color: "#4F46E5", fontWeight: "900" },
-  studentName:   { color: "#101828", fontWeight: "800", fontSize: 13 },
+  avatarText:    { color: "#4F46E5", fontFamily: fonts.extrabold },
+  studentName:   { color: "#101828", fontFamily: fonts.extrabold, fontSize: 13 },
   dot:           { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
-  studentStatus: { color: "#667085", fontWeight: "700", fontSize: 12 },
+  studentStatus: { color: "#667085", fontFamily: fonts.bold, fontSize: 12 },
 
   historyRow: {
     flexDirection: "row",
@@ -245,9 +246,9 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 10,
   },
-  historyName:   { color: "#101828", fontWeight: "800", fontSize: 13 },
-  historyTime:   { color: "#667085", fontWeight: "700", fontSize: 12, marginTop: 4 },
+  historyName:   { color: "#101828", fontFamily: fonts.extrabold, fontSize: 13 },
+  historyTime:   { color: "#667085", fontFamily: fonts.bold, fontSize: 12, marginTop: 4 },
   scorePill:     { minWidth: 44, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: "#EAECF0", backgroundColor: "#F9FAFB", alignItems: "center", justifyContent: "center" },
-  scorePillText: { color: "#101828", fontWeight: "900", fontSize: 12 },
-  noScore:       { color: "#98A2B3", fontWeight: "700", fontSize: 12 },
+  scorePillText: { color: "#101828", fontFamily: fonts.extrabold, fontSize: 12 },
+  noScore:       { color: "#98A2B3", fontFamily: fonts.bold, fontSize: 12 },
 });
