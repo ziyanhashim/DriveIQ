@@ -15,7 +15,7 @@ import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.database import (
-    bookings_col, instructor_profiles_col, results_col, sessions_col,
+    bookings_col, demo_scenarios_col, instructor_profiles_col, results_col, sessions_col,
 )
 from app.datasets import pick_csv_for_simulation, resolve_datasets_root
 from app.ml.predictor import predict_from_dataframe
@@ -296,6 +296,7 @@ def session_report(session_id: str, current_user=Depends(get_current_user)):
         "road_type": session.get("road_type", "Unknown"),
         "window_summary": ws,
         "summary_feedback": result.get("summary_feedback") if result else None,
+        "instructor_feedback": result.get("instructor_feedback") if result else None,
         "session": session,
         "analysis": analysis,
         "ai_feedback": ai_feedback,
@@ -315,6 +316,25 @@ def generate_session_feedback(session_id: str, body: GenerateFeedbackRequest, cu
     if session.get("instructor_id") != current_user.get("instructor_id"):
         raise HTTPException(status_code=403, detail="Forbidden")
 
+    # If simulation already produced results, just save instructor notes
+    existing = results_col.find_one({"session_id": session_id})
+    if existing and existing.get("windows"):
+        # Results already exist from /simulate — just add instructor notes
+        sessions_col.update_one(
+            {"session_id": session_id},
+            {"$set": {
+                "instructor_notes": body.instructor_notes,
+                "processed_at": now_utc(),
+            }},
+        )
+        return {
+            "status": "ok",
+            "session_id": session_id,
+            "total_windows": existing.get("session_summary", {}).get("total_windows", len(existing.get("windows", []))),
+            "performance_score": existing.get("performance_score") or session.get("performance_score"),
+        }
+
+    # No existing results — run full pipeline
     _ensure_ml_src()
     from knn_alerts_inference import run_full_knn_pipeline  # noqa: PLC0415
 
@@ -330,6 +350,18 @@ def generate_session_feedback(session_id: str, body: GenerateFeedbackRequest, cu
     summary = ml_result["session_summary"]
     ml_windows = ml_result["windows"]
 
+    # ── Generate LLM feedback ──────────────────────────────────
+    llm_session = {"summary_feedback": None, "instructor_feedback": None}
+    try:
+        from app.llm.feedback import generate_window_feedback, generate_session_feedback as gen_session_fb
+
+        perf_score = summary.get("performance_score", round(100 - summary.get("session_risk_score", 0), 2))
+        ml_windows = generate_window_feedback(ml_windows, rt, session_id)
+        llm_session = gen_session_fb(ml_windows, rt, perf_score, session_id)
+    except Exception as e:
+        import logging
+        logging.getLogger("driveiq.sessions").warning(f"LLM feedback failed for {session_id}: {e}")
+
     results_col.update_one(
         {"session_id": session_id},
         {"$set": {
@@ -340,6 +372,8 @@ def generate_session_feedback(session_id: str, body: GenerateFeedbackRequest, cu
             "road_type": rt,
             "session_summary": summary,
             "windows": ml_windows,
+            "summary_feedback": llm_session.get("summary_feedback"),
+            "instructor_feedback": llm_session.get("instructor_feedback"),
             "created_at": now_utc(),
         }},
         upsert=True,
@@ -349,13 +383,6 @@ def generate_session_feedback(session_id: str, body: GenerateFeedbackRequest, cu
         {"session_id": session_id},
         {"$set": {
             "performance_score":  summary.get("performance_score"),
-            "session_risk_score": summary.get("session_risk_score"),
-            "dominant_alert":     summary.get("dominant_alert"),
-            "average_severity":   summary.get("average_severity"),
-            "max_severity":       summary.get("max_severity"),
-            "total_windows":      summary.get("total_windows"),
-            "total_alerts":       summary.get("total_alerts"),
-            "window_summary":     summary.get("window_summary"),
             "instructor_notes":   body.instructor_notes,
             "processed_at":       now_utc(),
         }},
@@ -366,10 +393,6 @@ def generate_session_feedback(session_id: str, body: GenerateFeedbackRequest, cu
         "session_id": session_id,
         "total_windows": summary.get("total_windows", len(ml_windows)),
         "performance_score": summary.get("performance_score"),
-        "session_risk_score": summary.get("session_risk_score"),
-        "dominant_alert": summary.get("dominant_alert"),
-        "average_severity": summary.get("average_severity"),
-        "window_summary": summary.get("window_summary"),
     }
 
 
@@ -439,55 +462,61 @@ def end_session(session_id: str, body: SessionEndRequest, current_user=Depends(r
     if session.get("status") != "active":
         raise HTTPException(status_code=400, detail="Session is not active")
 
-    road_type = (session.get("road_type") or "secondary").strip().lower()
-    dataset_used = session.get("dataset_used")
+    # Check if simulation already produced results (from /simulate endpoint)
+    existing_result = results_col.find_one({"session_id": session_id})
 
-    if not dataset_used or "rel_path" not in dataset_used:
-        raise HTTPException(status_code=400, detail="No dataset stored for this session")
+    if not existing_result:
+        # No simulation results — run quick ML analysis from CSV
+        road_type = (session.get("road_type") or "secondary").strip().lower()
+        dataset_used = session.get("dataset_used")
 
-    root = resolve_datasets_root()
-    csv_path = (root / dataset_used["rel_path"]).resolve()
+        if not dataset_used or "rel_path" not in dataset_used:
+            raise HTTPException(status_code=400, detail="No dataset stored for this session")
 
-    if not csv_path.exists():
-        raise HTTPException(status_code=500, detail="Stored dataset file not found")
+        root = resolve_datasets_root()
+        csv_path = (root / dataset_used["rel_path"]).resolve()
 
-    df = pd.read_csv(csv_path)
+        if not csv_path.exists():
+            raise HTTPException(status_code=500, detail="Stored dataset file not found")
 
-    try:
-        ml_out = predict_from_dataframe(df, road_type)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"ML inference failed: {str(e)}")
+        df = pd.read_csv(csv_path)
 
-    analysis_summary = {
-        "behavior": ml_out.get("label", "Unknown"),
-        "confidence": float(ml_out.get("confidence", 0.0)),
-        "overall": int(ml_out.get("overall", 0)),
-        "badge": ml_out.get("badge", "Improving"),
-        "probs": ml_out.get("probs", {}),
-    }
+        try:
+            ml_out = predict_from_dataframe(df, road_type)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"ML inference failed: {str(e)}")
 
-    ai_feedback = [{
-        "priority": "high" if analysis_summary["behavior"] != "Normal" else "medium",
-        "title": "Session analysis",
-        "message": f"{analysis_summary['behavior']} (confidence {round(analysis_summary['confidence'] * 100)}%)",
-        "icon": "🤖",
-    }]
+        analysis_summary = {
+            "behavior": ml_out.get("label", "Unknown"),
+            "confidence": float(ml_out.get("confidence", 0.0)),
+            "overall": int(ml_out.get("overall", 0)),
+            "badge": ml_out.get("badge", "Improving"),
+            "probs": ml_out.get("probs", {}),
+        }
 
-    result_doc = {
-        "session_id": session_id,
-        "booking_id": session.get("booking_id"),
-        "trainee_id": session.get("trainee_id"),
-        "instructor_id": session.get("instructor_id"),
-        "instructor_name": session.get("instructor_name", ""),
-        "created_at": now_utc(),
-        "method": "ml_v1",
-        "dataset_used": dataset_used,
-        "analysis": analysis_summary,
-        "ai_feedback": ai_feedback,
-    }
+        ai_feedback = [{
+            "priority": "high" if analysis_summary["behavior"] != "Normal" else "medium",
+            "title": "Session analysis",
+            "message": f"{analysis_summary['behavior']} (confidence {round(analysis_summary['confidence'] * 100)}%)",
+            "icon": "🤖",
+        }]
 
-    ins = results_col.insert_one(result_doc)
+        result_doc = {
+            "session_id": session_id,
+            "booking_id": session.get("booking_id"),
+            "trainee_id": session.get("trainee_id"),
+            "instructor_id": session.get("instructor_id"),
+            "instructor_name": session.get("instructor_name", ""),
+            "created_at": now_utc(),
+            "method": "ml_v1",
+            "dataset_used": dataset_used,
+            "analysis": analysis_summary,
+            "ai_feedback": ai_feedback,
+        }
 
+        results_col.insert_one(result_doc)
+
+    # Mark session as completed
     sessions_col.update_one(
         {"session_id": session_id},
         {"$set": {"status": "completed", "ended_at": now_utc()}},
@@ -504,12 +533,139 @@ def end_session(session_id: str, body: SessionEndRequest, current_user=Depends(r
         {"$inc": {"total_sessions": 1}},
     )
 
+    # Return appropriate response
+    final_result = results_col.find_one({"session_id": session_id}, {"_id": 0})
     return {
         "status": "ok",
         "session_id": session_id,
-        "analysis": to_jsonable(analysis_summary),
-        "ai_feedback": to_jsonable(ai_feedback),
-        "result_id": str(ins.inserted_id),
+        "performance_score": session.get("performance_score") or (final_result.get("performance_score") if final_result else 0),
+    }
+
+
+# ── Simulate (demo live session) ─────────────────────────────────────────────
+
+@router.post("/sessions/{session_id}/simulate")
+def simulate_session(session_id: str, current_user=Depends(require_role("instructor"))):
+    """
+    Run full ML + LLM pipeline for a live session demo.
+    Picks a pre-computed demo scenario matching the session's road type,
+    stores the results in results_col, and returns all windows for the
+    frontend to reveal progressively.
+    """
+    session = sessions_col.find_one({"session_id": session_id})
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if session.get("instructor_id") != current_user.get("instructor_id"):
+        raise HTTPException(status_code=403, detail="Forbidden")
+    if session.get("status") != "active":
+        raise HTTPException(status_code=400, detail="Session is not active")
+
+    road_type = (session.get("road_type") or "Motorway").strip()
+
+    # Pick a demo scenario matching road type
+    road_key = "motorway" if road_type.lower() in ("motor", "motorway", "highway") else "secondary"
+    scenarios = list(demo_scenarios_col.find({"road_type_key": road_key}, {"_id": 0}))
+
+    if not scenarios:
+        raise HTTPException(
+            status_code=500,
+            detail=f"No demo scenarios found for {road_key}. Run: python -m scripts.seed_demo_scenarios",
+        )
+
+    import random
+    scenario = random.choice(scenarios)
+
+    windows = scenario["windows"]
+    summary = scenario["session_summary"]
+    performance_score = scenario.get("performance_score", round(100 - summary.get("session_risk_score", 0), 2))
+
+    # Store results so they're available for the report after session ends
+    results_col.update_one(
+        {"session_id": session_id},
+        {"$set": {
+            "session_id": session_id,
+            "trainee_id": session.get("trainee_id"),
+            "instructor_id": session.get("instructor_id"),
+            "booking_id": session.get("booking_id"),
+            "road_type": road_type,
+            "session_summary": summary,
+            "windows": windows,
+            "window_summary": scenario.get("window_summary"),
+            "performance_score": performance_score,
+            "summary_feedback": scenario.get("summary_feedback"),
+            "instructor_feedback": scenario.get("instructor_feedback"),
+            "method": "demo_simulation",
+            "created_at": now_utc(),
+        }},
+        upsert=True,
+    )
+
+    # Update session doc with performance data
+    sessions_col.update_one(
+        {"session_id": session_id},
+        {"$set": {
+            "performance_score": performance_score,
+            "session_risk_score": summary.get("session_risk_score"),
+            "dominant_alert": summary.get("dominant_alert"),
+            "average_severity": summary.get("average_severity"),
+            "max_severity": summary.get("max_severity"),
+            "total_windows": summary.get("total_windows"),
+            "total_alerts": summary.get("total_alerts"),
+            "window_summary": scenario.get("window_summary"),
+        }},
+    )
+
+    return to_jsonable({
+        "status": "ok",
+        "session_id": session_id,
+        "road_type": road_type,
+        "performance_score": performance_score,
+        "total_windows": len(windows),
+        "summary_feedback": scenario.get("summary_feedback"),
+        "instructor_feedback": scenario.get("instructor_feedback"),
+        "windows": windows,
+    })
+
+
+# ── Clear demo session history ────────────────────────────────────────────────
+
+@router.delete("/sessions/clear-demo")
+def clear_demo_sessions(current_user=Depends(get_current_user)):
+    """
+    Clear sessions created via the demo simulation.
+    Only removes sessions with method='demo_simulation' in results.
+    Resets related bookings to 'confirmed' so they can be reused.
+    """
+    # Find demo results
+    demo_results = list(results_col.find({"method": "demo_simulation"}, {"session_id": 1}))
+    demo_session_ids = [r["session_id"] for r in demo_results]
+
+    if not demo_session_ids:
+        return {"status": "ok", "cleared": 0}
+
+    # Get booking IDs to reset
+    demo_sessions = list(sessions_col.find(
+        {"session_id": {"$in": demo_session_ids}},
+        {"booking_id": 1},
+    ))
+    booking_ids = [s["booking_id"] for s in demo_sessions if s.get("booking_id")]
+
+    # Delete results and sessions
+    r_del = results_col.delete_many({"session_id": {"$in": demo_session_ids}})
+    s_del = sessions_col.delete_many({"session_id": {"$in": demo_session_ids}})
+
+    # Reset bookings back to confirmed
+    if booking_ids:
+        bookings_col.update_many(
+            {"booking_id": {"$in": booking_ids}},
+            {"$set": {"status": "confirmed", "session_id": None}},
+        )
+
+    return {
+        "status": "ok",
+        "cleared": r_del.deleted_count,
+        "sessions_removed": s_del.deleted_count,
+        "bookings_reset": len(booking_ids),
     }
 
 

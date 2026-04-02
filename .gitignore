@@ -35,6 +35,14 @@ CLAUDE.md
 # Dev scripts
 start-dev.sh
 
+# Demo/presentation utilities
+backend/scripts/seed_demo_scenarios.py
+ml-model/src/generate_all_test_sessions.py
+ml-model/src/test_sessions/
+ml-model/src/test_session.json
+backend/datasets/
+frontend/marketing/components/*.txt
+
 # OS Files
 .DS_Store
 Thumbs.db

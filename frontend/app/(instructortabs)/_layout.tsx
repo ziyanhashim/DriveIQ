@@ -11,7 +11,7 @@ import InstructorSidebar from "../../components/InstructorSidebar";
 const TABS = [
   { name: "dashboard", label: "Dashboard", icon: "⊞" },
   { name: "sessions",  label: "Sessions",  icon: "◷" },
-  { name: "records",   label: "Records",   icon: "▤" },
+  { name: "records",   label: "Reports",    icon: "📄" },
   { name: "settings",  label: "Settings",  icon: "⚙" },
 ] as const;
 
@@ -130,14 +130,9 @@ export default function InstructorTabsLayout() {
         </Pressable>
       </Modal>
 
-      {/* Body: content + optional right sidebar */}
+      {/* Body */}
       <View style={s.body}>
         <View style={s.content}><Slot /></View>
-        {!isPhone && (
-          <View style={s.sidebar}>
-            <InstructorSidebar />
-          </View>
-        )}
       </View>
     </SafeAreaView>
   );
@@ -173,8 +168,8 @@ const s = StyleSheet.create({
   tabPressed:     { opacity: 0.7 },
   tabIcon:        { fontSize: 14, color: colors.subtext },
   tabIconActive:  { color: "#FFFFFF" },
-  tabLabel:       { fontSize: 13, fontWeight: "700", color: "#374151" },
-  tabLabelActive: { color: "#FFFFFF", fontWeight: "700", fontSize: 13 },
+  tabLabel:       { fontSize: 13, fontWeight: "700", color: "#374151", userSelect: "none" },
+  tabLabelActive: { color: "#FFFFFF", fontWeight: "700", fontSize: 13, userSelect: "none" },
 
   // User pill
   userWrap:   { flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: space.sm, paddingVertical: 6, borderRadius: radius.sm },
@@ -193,8 +188,8 @@ const s = StyleSheet.create({
   mobileItem:       { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: space.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.borderFaint },
   mobileItemActive: { backgroundColor: colors.purpleLight },
   mobileIcon:       { fontSize: 16, color: colors.subtext },
-  mobileLabel:      { fontSize: 14, fontWeight: "700", color: "#374151" },
-  mobileLabelActive:{ color: colors.purpleDark },
+  mobileLabel:      { fontSize: 14, fontWeight: "700", color: "#374151", userSelect: "none" },
+  mobileLabelActive:{ color: colors.purpleDark, userSelect: "none" },
 
   // Body + sidebar
   body:    { flex: 1, flexDirection: "row", overflow: "visible" },

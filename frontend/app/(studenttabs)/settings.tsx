@@ -15,7 +15,7 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
-import { apiGet, apiPut, apiPost, apiPatch } from "../../lib/api";
+import { apiGet, apiPut, apiPost, apiPatch, apiDelete } from "../../lib/api";
 import { clearToken } from "../../lib/token";
 import { colors as COLORS, radius, space, card as cardPreset, btn, type_, fonts } from "../../lib/theme";
 
@@ -343,6 +343,22 @@ export default function Settings() {
             <SupportTile icon="document-text-outline"    iconColor={COLORS.green} title="FAQs"            sub="Find quick answers"         onPress={() => Alert.alert("FAQs", "Open FAQs screen (mock).")} />
             <SupportTile icon="bug-outline"              iconColor="#EF4444"      title="Report a Bug"    sub="Help us improve"            onPress={() => Alert.alert("Bug Report", "Open bug report form (mock).")} />
           </View>
+
+          <Pressable
+            style={[styles.logoutBtn, { backgroundColor: "#DC2626" }]}
+            onPress={() => {
+              const ok = window?.confirm?.("This will remove recent session data. Are you sure?") ?? true;
+              if (!ok) return;
+              apiDelete("/sessions/clear-demo").then(() => {
+                Alert.alert("Done", "Session history cleared.");
+              }).catch(() => {
+                Alert.alert("Error", "Failed to clear session history.");
+              });
+            }}
+          >
+            <Ionicons name="trash-outline" size={18} color="#FFFFFF" />
+            <Text style={styles.logoutText}>Clear Session History</Text>
+          </Pressable>
 
           <Pressable style={styles.logoutBtn} onPress={handleLogout}>
             <Ionicons name="log-out-outline" size={18} color="#FFFFFF" />

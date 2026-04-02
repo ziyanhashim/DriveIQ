@@ -137,6 +137,17 @@ def upload_and_process(
     summary = ml_result["session_summary"]
     windows = ml_result["windows"]
 
+    # ── 3b. Generate LLM feedback ──────────────────────────────
+    try:
+        from app.llm.feedback import generate_window_feedback, generate_session_feedback as gen_session_fb
+
+        performance_score = round(100 - summary["session_risk_score"], 2)
+        windows = generate_window_feedback(windows, road_type, session_id)
+        llm_session = gen_session_fb(windows, road_type, performance_score, session_id)
+    except Exception as e:
+        logger.warning(f"LLM feedback generation failed for {session_id}: {e}")
+        llm_session = {"summary_feedback": None, "instructor_feedback": None}
+
     # ── 4. Store full ML results in results_col ─────────────────
     result_doc = {
         "session_id": session_id,
@@ -146,6 +157,8 @@ def upload_and_process(
         "road_type": road_type,
         "session_summary": summary,
         "windows": windows,
+        "summary_feedback": llm_session.get("summary_feedback"),
+        "instructor_feedback": llm_session.get("instructor_feedback"),
         "created_at": datetime.utcnow(),
     }
     results_col.insert_one(result_doc)

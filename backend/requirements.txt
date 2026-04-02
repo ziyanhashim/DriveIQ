@@ -12,3 +12,5 @@ joblib
 python-multipart
 scikit-learn
 tensorflow
+openai
+dspydantic

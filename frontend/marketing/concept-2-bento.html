@@ -3,166 +3,270 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DriveIQ — Your AI-Powered Driving Coach</title>
+  <title>DriveIQ — Intelligent Driving Analysis</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <style>
-    /* ========== CSS Custom Properties ========== */
+    /* ══════════════════════════════════════════════════════════════
+       DRIVEIQ — WARM DARK THEME
+       ══════════════════════════════════════════════════════════════ */
+
     :root {
-      --primary-blue: #2563EB;
-      --primary-blue-dark: #1D4ED8;
-      --accent-purple: #7C3AED;
-      --dark-purple: #6D28D9;
-      --deep-purple: #5B21B6;
-      --dark-bg: #0B1220;
-      --success-green: #16A34A;
-      --amber: #D97706;
-      --page-bg: #F8FAFC;
-      --card-bg: #FFFFFF;
-      --text-primary: #0F172A;
-      --text-muted: #64748B;
-      --border-color: #EAECF0;
-      --tint-blue: #EFF6FF;
-      --tint-purple: #F5F3FF;
-      --tint-green: #ECFDF3;
-      --tint-amber: #FEF9C3;
-      --footer-bg: #F1F5F9;
-      --font-sans: 'Sora', sans-serif;
+      --bg-deep: #111111;
+      --bg-surface: #191919;
+      --bg-card: rgba(255,255,255,0.03);
+      --bg-card-hover: rgba(255,255,255,0.06);
+      --border-glass: rgba(255,255,255,0.06);
+      --border-glow: rgba(255,224,194,0.15);
+
+      --cyan: #ffe0c2;
+      --cyan-dim: rgba(255,224,194,0.10);
+      --cyan-glow: rgba(255,224,194,0.25);
+      --amber: #ffdfb5;
+      --amber-dim: rgba(255,223,181,0.10);
+      --green: #00E676;
+      --green-dim: rgba(0,230,118,0.10);
+      --red: #e54d2e;
+      --red-dim: rgba(229,77,46,0.10);
+
+      --text-bright: #eeeeee;
+      --text-primary: #d4d4d4;
+      --text-muted: #7a7a7a;
+      --text-dim: #3a3a3a;
+
+      --grid-color: rgba(255,224,194,0.08);
+      --grid-hover-color: rgba(255,224,194,0.35);
+
+      --font-display: 'Sora', sans-serif;
       --font-mono: 'Space Mono', monospace;
       --max-width: 1200px;
-      --radius-card: 24px;
+      --radius: 16px;
+      --radius-lg: 24px;
       --radius-pill: 100px;
     }
 
-    /* ========== Reset & Base ========== */
-    *, *::before, *::after {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    html {
-      scroll-behavior: smooth;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-    }
-
+    /* ── Reset ──────────────────────────────────────────────────── */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; }
     body {
-      font-family: var(--font-sans);
-      font-size: 17px;
+      font-family: var(--font-display);
+      font-size: 16px;
       line-height: 1.7;
       color: var(--text-primary);
-      background-color: var(--page-bg);
+      background: var(--bg-deep);
+      overflow-x: hidden;
+    }
+    a { text-decoration: none; color: inherit; }
+    ul { list-style: none; }
+
+    /* ── Background Atmosphere ─────────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 60% 50% at 75% 10%, rgba(255,224,194,0.04) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 40% at 15% 85%, rgba(100,74,64,0.06) 0%, transparent 50%);
+      pointer-events: none;
+      z-index: 0;
     }
 
-    a {
-      text-decoration: none;
-      color: inherit;
+    /* ── Grid background layers ───────────────────────────────── */
+    .grid-bg {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
     }
-
-    ul {
-      list-style: none;
-    }
-
-    /* ========== Utility ========== */
-    .container {
+    .grid-bg__base,
+    .grid-bg__hover {
+      position: absolute;
+      inset: 0;
       width: 100%;
-      max-width: var(--max-width);
-      margin: 0 auto;
-      padding: 0 24px;
+      height: 100%;
     }
+    .grid-bg__base { opacity: 0.04; }
+    .grid-bg__hover {
+      opacity: 0.35;
+      mask-image: radial-gradient(300px circle at 50% 50%, black, transparent);
+      -webkit-mask-image: radial-gradient(300px circle at 50% 50%, black, transparent);
+    }
+
+    /* ── Utility ────────────────────────────────────────────────── */
+    .container { width: 100%; max-width: var(--max-width); margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
 
     .section-label {
       font-family: var(--font-mono);
-      font-size: 13px;
-      font-weight: 400;
+      font-size: 11px;
+      font-weight: 500;
       text-transform: uppercase;
-      letter-spacing: 4px;
-      color: var(--accent-purple);
+      letter-spacing: 5px;
+      color: var(--cyan);
       margin-bottom: 16px;
     }
 
     .section-title {
-      font-family: var(--font-sans);
-      font-weight: 700;
-      font-size: 32px;
-      letter-spacing: -1px;
-      color: var(--text-primary);
-      line-height: 1.2;
-      margin-bottom: 48px;
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 36px;
+      letter-spacing: -1.5px;
+      color: var(--text-bright);
+      line-height: 1.15;
+      margin-bottom: 56px;
     }
 
-    /* ========== Buttons ========== */
-    .btn-dark {
-      display: inline-block;
-      font-family: var(--font-sans);
-      font-weight: 600;
+    /* ── Road Divider ──────────────────────────────────────────── */
+    .road-divider {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 0;
+    }
+    .road-divider__line {
+      width: 100%;
+      max-width: 300px;
+      height: 2px;
+      background: repeating-linear-gradient(90deg, var(--text-dim) 0, var(--text-dim) 16px, transparent 16px, transparent 28px);
+    }
+
+    /* ── Glass Card Base ───────────────────────────────────────── */
+    .glass {
+      background: var(--bg-card);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid var(--border-glass);
+      border-radius: var(--radius-lg);
+      transition: border-color 0.4s ease, background 0.4s ease, transform 0.4s ease;
+    }
+    .glass:hover {
+      border-color: var(--border-glow);
+      background: var(--bg-card-hover);
+    }
+
+    /* ── Buttons ────────────────────────────────────────────────── */
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-display);
+      font-weight: 700;
       font-size: 15px;
-      color: #FFFFFF;
-      background: var(--dark-bg);
+      color: var(--bg-deep);
+      background: var(--cyan);
       border: none;
       border-radius: var(--radius-pill);
-      padding: 14px 32px;
+      padding: 14px 36px;
       cursor: pointer;
       transition: transform 0.3s ease, box-shadow 0.3s ease;
+      text-decoration: none;
     }
-
-    .btn-dark:hover {
+    .btn-primary:hover {
       transform: translateY(-2px);
-      box-shadow: 0 8px 24px rgba(11, 18, 32, 0.3);
+      box-shadow: 0 8px 32px var(--cyan-glow), 0 0 60px rgba(0,229,255,0.1);
+    }
+    .btn-primary--large { font-size: 17px; padding: 18px 44px; }
+
+    .btn-outline {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-display);
+      font-weight: 600;
+      font-size: 15px;
+      color: var(--text-primary);
+      background: transparent;
+      border: 1px solid var(--border-glass);
+      border-radius: var(--radius-pill);
+      padding: 14px 36px;
+      cursor: pointer;
+      transition: border-color 0.3s ease, color 0.3s ease;
+    }
+    .btn-outline:hover { border-color: var(--cyan); color: var(--cyan); }
+
+    /* ── Scroll Reveal ─────────────────────────────────────────── */
+    .reveal {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
     }
 
-    .btn-dark--large {
-      font-size: 18px;
-      padding: 18px 40px;
-    }
-
-    /* ========== Navigation ========== */
+    /* ══════════════════════════════════════════════════════════════
+       NAVIGATION
+       ══════════════════════════════════════════════════════════════ */
     .nav {
-      position: sticky;
+      position: fixed;
       top: 0;
+      left: 0;
+      right: 0;
       z-index: 100;
-      background: var(--card-bg);
-      border-bottom: 1px solid var(--border-color);
+      padding: 0 8px;
     }
-
+    .nav__bar {
+      max-width: var(--max-width);
+      margin: 8px auto 0;
+      padding: 0 24px;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 0;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      transition: max-width 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+                  background 0.4s ease,
+                  border-color 0.4s ease,
+                  border-radius 0.4s ease,
+                  padding 0.4s ease,
+                  margin-top 0.4s ease,
+                  backdrop-filter 0.3s ease;
+    }
+    .nav.scrolled .nav__bar {
+      max-width: 800px;
+      background: rgba(17,17,17,0.75);
+      border-color: var(--border-glass);
+      border-radius: var(--radius-pill);
+      padding: 0 20px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      margin-top: 10px;
+    }
     .nav__inner {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      height: 64px;
+      height: 56px;
+      transition: height 0.3s ease;
     }
+    .nav.scrolled .nav__inner { height: 48px; }
 
+    /* Hide/show buttons based on scroll state */
+    .nav__link-group { display: flex; gap: 8px; transition: opacity 0.3s ease; }
+    .nav__cta-expanded { opacity: 1; transition: opacity 0.3s ease; }
+    .nav__cta-compact { opacity: 0; position: absolute; pointer-events: none; transition: opacity 0.3s ease; }
+    .nav.scrolled .nav__cta-expanded { opacity: 0; position: absolute; pointer-events: none; }
+    .nav.scrolled .nav__cta-compact { opacity: 1; position: static; pointer-events: auto; }
     .nav__logo {
-      font-family: var(--font-sans);
-      font-weight: 800;
-      font-size: 20px;
-      color: var(--text-primary);
+      font-family: var(--font-display);
+      font-weight: 900;
+      font-size: 22px;
+      color: var(--text-bright);
+      letter-spacing: -0.5px;
     }
-
-    .nav__links {
-      display: flex;
-      align-items: center;
-      gap: 32px;
-    }
-
+    .nav__logo span { color: var(--cyan); }
+    .nav__links { display: flex; align-items: center; gap: 36px; }
     .nav__link {
-      font-family: var(--font-sans);
-      font-weight: 600;
-      font-size: 15px;
+      font-family: var(--font-display);
+      font-weight: 500;
+      font-size: 14px;
       color: var(--text-muted);
       transition: color 0.2s ease;
+      letter-spacing: 0.3px;
     }
-
-    .nav__link:hover {
-      color: var(--text-primary);
-    }
-
-    .nav__cta {
-      font-size: 14px;
-      padding: 10px 24px;
-    }
+    .nav__link:hover { color: var(--text-bright); }
+    .nav__cta { font-size: 13px; padding: 10px 24px; }
 
     .nav__hamburger {
       display: none;
@@ -173,927 +277,1096 @@
       cursor: pointer;
       padding: 4px;
     }
-
     .nav__hamburger span {
-      display: block;
-      width: 22px;
-      height: 2px;
-      background: var(--text-primary);
-      border-radius: 2px;
-      transition: transform 0.3s ease, opacity 0.3s ease;
+      display: block; width: 22px; height: 2px;
+      background: var(--text-primary); border-radius: 2px;
     }
-
     .nav__mobile-menu {
       display: none;
       flex-direction: column;
       gap: 16px;
       padding: 24px;
-      background: var(--card-bg);
-      border-bottom: 1px solid var(--border-color);
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border-glass);
     }
-
-    .nav__mobile-menu.active {
-      display: flex;
-    }
-
+    .nav__mobile-menu.active { display: flex; }
     .nav__mobile-menu a {
-      font-family: var(--font-sans);
-      font-weight: 600;
+      font-family: var(--font-display);
+      font-weight: 500;
       font-size: 16px;
       color: var(--text-muted);
     }
 
-    /* ========== Hero ========== */
+    /* ══════════════════════════════════════════════════════════════
+       HERO
+       ══════════════════════════════════════════════════════════════ */
     .hero {
-      background: var(--card-bg);
-      padding: 120px 24px 80px;
+      padding: 160px 24px 100px;
       text-align: center;
+      position: relative;
+      z-index: 1;
     }
-
-    .hero__inner {
-      max-width: 800px;
-      margin: 0 auto;
-    }
+    .hero__inner { max-width: 800px; margin: 0 auto; }
 
     .hero__overline {
       font-family: var(--font-mono);
-      font-weight: 400;
-      font-size: 13px;
+      font-size: 12px;
+      font-weight: 500;
       text-transform: uppercase;
-      letter-spacing: 4px;
-      color: var(--accent-purple);
+      letter-spacing: 6px;
+      color: var(--cyan);
       margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+    }
+    .hero__overline::before {
+      content: '';
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 12px var(--cyan-glow);
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; box-shadow: 0 0 12px var(--cyan-glow); }
+      50% { opacity: 0.5; box-shadow: 0 0 4px var(--cyan-glow); }
     }
 
     .hero__headline {
-      font-family: var(--font-sans);
-      font-weight: 800;
-      font-size: 64px;
+      font-family: var(--font-display);
+      font-weight: 900;
+      font-size: clamp(40px, 7vw, 72px);
       letter-spacing: -3px;
-      line-height: 1.1;
-      color: var(--text-primary);
-      margin-bottom: 24px;
+      color: var(--text-bright);
+      line-height: 1.05;
+      margin-bottom: 28px;
+    }
+    .hero__headline em {
+      font-style: normal;
+      background: linear-gradient(135deg, var(--cyan), #b08968);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
     }
 
     .hero__subtitle {
-      font-family: var(--font-sans);
+      font-family: var(--font-display);
       font-weight: 400;
-      font-size: 20px;
+      font-size: 18px;
       color: var(--text-muted);
-      max-width: 600px;
+      max-width: 520px;
       margin: 0 auto 40px;
-      line-height: 1.6;
+      line-height: 1.7;
     }
 
     .hero__cta-wrap {
-      margin-bottom: 16px;
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
     }
 
     .hero__note {
-      font-family: var(--font-sans);
-      font-weight: 400;
-      font-size: 14px;
-      color: var(--text-muted);
+      margin-top: 20px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-dim);
+      letter-spacing: 0.5px;
     }
 
-    /* ========== Bento Grid ========== */
-    .bento {
-      padding: 80px 0;
+    /* Hero gauge decoration */
+    .hero__gauge {
+      margin-top: 60px;
+      display: flex;
+      justify-content: center;
     }
+    .gauge-display {
+      position: relative;
+      width: 200px;
+      height: 120px;
+    }
+    .gauge-display svg {
+      width: 200px;
+      height: 120px;
+    }
+    .gauge-arc {
+      fill: none;
+      stroke: var(--text-dim);
+      stroke-width: 6;
+      stroke-linecap: round;
+    }
+    .gauge-arc-fill {
+      fill: none;
+      stroke: url(#gaugeGrad);
+      stroke-width: 6;
+      stroke-linecap: round;
+      stroke-dasharray: 220;
+      stroke-dashoffset: 220;
+      animation: gauge-fill 2s cubic-bezier(0.16, 1, 0.3, 1) 0.5s forwards;
+    }
+    @keyframes gauge-fill {
+      to { stroke-dashoffset: 44; }
+    }
+    .gauge-value {
+      position: absolute;
+      bottom: 4px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 36px;
+      color: var(--text-bright);
+    }
+    .gauge-label {
+      position: absolute;
+      bottom: -16px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 3px;
+    }
+
+    /* ══════════════════════════════════════════════════════════════
+       BENTO GRID
+       ══════════════════════════════════════════════════════════════ */
+    .bento { padding: 80px 0 40px; position: relative; z-index: 1; }
 
     .bento__grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: auto auto auto;
       gap: 16px;
     }
 
     .bento-card {
-      border-radius: var(--radius-card);
-      padding: 36px;
-      overflow: hidden;
-      position: relative;
-      transition: transform 0.3s ease, box-shadow 0.3s ease;
-    }
-
-    .bento-card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1);
-    }
-
-    .bento-card__title {
-      font-family: var(--font-sans);
-      font-weight: 700;
-      font-size: 22px;
-      margin-bottom: 12px;
-      line-height: 1.3;
-    }
-
-    .bento-card__body {
-      font-family: var(--font-sans);
-      font-weight: 400;
-      font-size: 15px;
-      line-height: 1.6;
-    }
-
-    /* Card A — Real-time Behavior Analysis */
-    .card-a {
-      grid-column: span 2;
-      background: linear-gradient(135deg, var(--accent-purple), var(--deep-purple));
-      color: #FFFFFF;
-      min-height: 320px;
-    }
-
-    .card-a .bento-card__title {
-      font-size: 24px;
-      color: #FFFFFF;
-    }
-
-    .card-a .bento-card__body {
-      color: rgba(255, 255, 255, 0.85);
-      max-width: 400px;
-    }
-
-    .score-ring {
-      position: absolute;
-      bottom: -16px;
-      right: 24px;
-      width: 120px;
-      height: 120px;
-      border-radius: 50%;
-      background: conic-gradient(#FFFFFF 0% 85%, rgba(255, 255, 255, 0.2) 85% 100%);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .score-ring::before {
-      content: '';
-      position: absolute;
-      width: 88px;
-      height: 88px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, var(--accent-purple), var(--deep-purple));
-    }
-
-    .score-ring__value {
-      position: relative;
-      z-index: 1;
-      font-family: var(--font-mono);
-      font-weight: 700;
-      font-size: 32px;
-      color: #FFFFFF;
-    }
-
-    /* Card B — Smart Alerts */
-    .card-b {
-      background: var(--tint-amber);
-      color: var(--text-primary);
-    }
-
-    .card-b__emoji {
-      font-size: 48px;
-      margin-bottom: 16px;
-      display: block;
-    }
-
-    .card-b .bento-card__title {
-      font-size: 20px;
-    }
-
-    .alert-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      margin-top: 20px;
-      padding: 8px 16px;
-      border: 1.5px solid var(--amber);
-      border-radius: var(--radius-pill);
-      font-family: var(--font-sans);
-      font-weight: 500;
-      font-size: 13px;
-      color: var(--amber);
-    }
-
-    .alert-pill__dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--amber);
-    }
-
-    /* Card C — Session Reports */
-    .card-c {
-      background: var(--tint-blue);
-      color: var(--text-primary);
-    }
-
-    .card-c__emoji {
-      font-size: 36px;
-      margin-bottom: 16px;
-      display: block;
-    }
-
-    .mini-chart {
-      margin-top: 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .mini-chart__row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .mini-chart__label {
-      font-family: var(--font-sans);
-      font-weight: 500;
-      font-size: 12px;
-      color: var(--text-muted);
-      width: 56px;
-      flex-shrink: 0;
-    }
-
-    .mini-chart__bar-track {
-      flex: 1;
-      height: 8px;
-      background: rgba(0, 0, 0, 0.06);
-      border-radius: 4px;
-      overflow: hidden;
-    }
-
-    .mini-chart__bar-fill {
-      height: 100%;
-      border-radius: 4px;
-    }
-
-    .mini-chart__bar-fill--green {
-      width: 72%;
-      background: var(--success-green);
-    }
-
-    .mini-chart__bar-fill--amber {
-      width: 18%;
-      background: var(--amber);
-    }
-
-    .mini-chart__bar-fill--red {
-      width: 10%;
-      background: #DC2626;
-    }
-
-    .mini-chart__value {
-      font-family: var(--font-mono);
-      font-weight: 700;
-      font-size: 12px;
-      color: var(--text-muted);
-      width: 32px;
-      text-align: right;
-      flex-shrink: 0;
-    }
-
-    /* Card D — How It Works */
-    .card-d {
-      grid-column: span 2;
-      background: var(--card-bg);
-      border: 1px solid var(--border-color);
-      color: var(--text-primary);
-    }
-
-    .steps-flow {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-top: 28px;
-      gap: 0;
-    }
-
-    .step {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 12px;
-      flex: 1;
-    }
-
-    .step__circle {
-      width: 52px;
-      height: 52px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: var(--font-mono);
-      font-weight: 700;
-      font-size: 16px;
-      color: #FFFFFF;
-      flex-shrink: 0;
-    }
-
-    .step__circle--blue { background: var(--primary-blue); }
-    .step__circle--purple { background: var(--accent-purple); }
-    .step__circle--amber { background: var(--amber); }
-    .step__circle--green { background: var(--success-green); }
-
-    .step__label {
-      font-family: var(--font-sans);
-      font-weight: 600;
-      font-size: 14px;
-      color: var(--text-primary);
-    }
-
-    .step-connector {
-      flex: 0.6;
-      border-top: 2px dashed var(--border-color);
-      align-self: flex-start;
-      margin-top: 26px;
-    }
-
-    /* Cards E, F, G — Stats */
-    .card-stat {
-      display: flex;
-      flex-direction: column;
-      justify-content: flex-end;
-      min-height: 200px;
-    }
-
-    .card-e {
-      background: radial-gradient(circle at center, #131d33, var(--dark-bg));
-      color: #FFFFFF;
-    }
-
-    .card-f {
-      background: radial-gradient(circle at center, #131d33, var(--dark-bg));
-      color: #FFFFFF;
-    }
-
-    .card-g {
-      background: linear-gradient(135deg, var(--primary-blue), var(--primary-blue-dark));
-      color: #FFFFFF;
-    }
-
-    .card-stat__number {
-      font-family: var(--font-mono);
-      font-weight: 700;
-      font-size: 64px;
-      line-height: 1;
-      margin-bottom: 8px;
-    }
-
-    .card-stat__number--smaller {
-      font-size: 48px;
-    }
-
-    .card-stat__desc {
-      font-family: var(--font-sans);
-      font-weight: 400;
-      font-size: 14px;
-      color: rgba(255, 255, 255, 0.6);
-    }
-
-    .card-g .card-stat__desc {
-      color: rgba(255, 255, 255, 0.8);
-    }
-
-    /* ========== Audience Section ========== */
-    .audience {
-      background: var(--card-bg);
-      padding: 80px 0;
-    }
-
-    .audience__grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 24px;
-    }
-
-    .audience-card {
-      background: var(--card-bg);
-      border: 1px solid var(--border-color);
-      border-radius: 20px;
       padding: 32px;
       position: relative;
       overflow: hidden;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-      transition: transform 0.3s ease, box-shadow 0.3s ease;
     }
 
-    .audience-card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1);
-    }
-
-    .audience-card__bar {
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 4px;
-    }
-
-    .audience-card__bar--blue { background: var(--primary-blue); }
-    .audience-card__bar--purple { background: var(--accent-purple); }
-    .audience-card__bar--green { background: var(--success-green); }
-
-    .audience-card__emoji {
-      font-size: 32px;
-      margin-bottom: 16px;
-      display: block;
-    }
-
-    .audience-card__title {
-      font-family: var(--font-sans);
+    .bento-card__title {
+      font-family: var(--font-display);
       font-weight: 700;
-      font-size: 20px;
-      margin-bottom: 20px;
+      font-size: 18px;
+      color: var(--text-bright);
+      margin-bottom: 10px;
+    }
+
+    .bento-card__body {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+
+    /* Card A: spans 2 cols */
+    .card-a { grid-column: span 2; }
+
+    /* Gauge ring in Card A */
+    .score-gauge {
+      margin-top: 24px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    .score-gauge__ring {
+      position: relative;
+      width: 80px;
+      height: 80px;
+    }
+    .score-gauge__ring svg { width: 80px; height: 80px; transform: rotate(-90deg); }
+    .score-gauge__track { fill: none; stroke: var(--text-dim); stroke-width: 5; }
+    .score-gauge__fill {
+      fill: none;
+      stroke: var(--cyan);
+      stroke-width: 5;
+      stroke-linecap: round;
+      stroke-dasharray: 220;
+      stroke-dashoffset: 220;
+      animation: ring-fill 1.8s cubic-bezier(0.16, 1, 0.3, 1) 0.8s forwards;
+    }
+    @keyframes ring-fill { to { stroke-dashoffset: 33; } }
+    .score-gauge__value {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 22px;
+      color: var(--cyan);
+    }
+    .score-gauge__meta { font-size: 13px; color: var(--text-muted); }
+    .score-gauge__meta strong { color: var(--text-bright); font-weight: 600; }
+
+    /* Card B */
+    .alert-indicator {
+      margin-top: 20px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--amber-dim);
+      border: 1px solid rgba(255,184,0,0.2);
+      border-radius: var(--radius-pill);
+      padding: 8px 16px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--amber);
+      font-weight: 500;
+    }
+    .alert-indicator__dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--amber);
+      animation: pulse-dot 1.5s ease-in-out infinite;
+    }
+
+    /* Card C: mini bars */
+    .hud-bars { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; }
+    .hud-bar { display: flex; align-items: center; gap: 10px; }
+    .hud-bar__label {
+      width: 56px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .hud-bar__track {
+      flex: 1; height: 6px; border-radius: 3px;
+      background: rgba(255,255,255,0.05);
+      overflow: hidden;
+    }
+    .hud-bar__fill {
+      height: 100%; border-radius: 3px;
+      animation: bar-grow 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      transform-origin: left;
+    }
+    @keyframes bar-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+    .hud-bar__fill--green { background: var(--green); width: 72%; animation-delay: 0.6s; transform: scaleX(0); }
+    .hud-bar__fill--amber { background: var(--amber); width: 18%; animation-delay: 0.8s; transform: scaleX(0); }
+    .hud-bar__fill--red { background: var(--red); width: 10%; animation-delay: 1.0s; transform: scaleX(0); }
+    .hud-bar__val {
+      width: 36px;
+      text-align: right;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
       color: var(--text-primary);
     }
 
-    .audience-card__list {
+    /* ══════════════════════════════════════════════════════════════
+       HOW IT WORKS — STICKY HEADER + SCROLLING STEPS
+       ══════════════════════════════════════════════════════════════ */
+    .hiw {
+      position: relative;
+      z-index: 2;
+    }
+
+    /* Sticky header — stays pinned while steps scroll beneath */
+    .hiw__header-wrap {
+      position: sticky;
+      top: 56px; /* below navbar */
+      z-index: 10;
+      background: linear-gradient(180deg, var(--bg-deep) 70%, transparent 100%);
+      padding: 20px 0 16px;
+    }
+    .hiw__header {
+      text-align: center;
+    }
+    .hiw__label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 4px;
+      color: var(--cyan);
+      margin-bottom: 6px;
+    }
+    .hiw__title {
+      font-family: var(--font-display);
+      font-weight: 900;
+      font-size: 28px;
+      color: var(--text-bright);
+      letter-spacing: -1.5px;
+    }
+    .hiw__sub {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* Progress bar under the sticky header */
+    .hiw__progress {
+      width: 100%;
+      max-width: 320px;
+      height: 2px;
+      background: var(--text-dim);
+      border-radius: 2px;
+      margin: 12px auto 0;
+      position: relative;
+    }
+    .hiw__progress-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 2px;
+      background: linear-gradient(90deg, var(--cyan), var(--amber), var(--green), #e54d2e);
+      transition: width 0.15s linear;
+    }
+    .hiw__progress-dots {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: space-between;
+      transform: translateY(-50%);
+    }
+    .hiw__dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      border: 2px solid var(--text-dim);
+      background: var(--bg-deep);
+      transition: border-color 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
+    }
+    .hiw__dot.active { box-shadow: 0 0 10px; }
+    .hiw__dot--cyan.active { border-color: var(--cyan); background: var(--cyan); box-shadow: 0 0 10px var(--cyan-glow); }
+    .hiw__dot--amber.active { border-color: var(--amber); background: var(--amber); box-shadow: 0 0 10px rgba(255,184,0,0.4); }
+    .hiw__dot--green.active { border-color: var(--green); background: var(--green); box-shadow: 0 0 10px rgba(0,230,118,0.4); }
+    .hiw__dot--red.active { border-color: var(--red); background: var(--red); box-shadow: 0 0 10px rgba(255,61,113,0.4); }
+
+    /* Steps scroll in normal flow under the sticky header */
+    .hiw__steps-list {
+      padding: 20px 0 80px;
+    }
+
+    .hiw__step {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 48px;
+      align-items: center;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 60px 24px;
+      min-height: 80vh;
+      opacity: 0;
+      transform: translateY(40px);
+      transition: opacity 0.7s ease, transform 0.7s ease;
+    }
+    .hiw__step.in-view {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .hiw__step:nth-child(even) .hiw__step-visual { order: -1; }
+
+    /* Step content */
+    .hiw__step-num {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 56px;
+      line-height: 1;
+      margin-bottom: 8px;
+      opacity: 0.15;
+    }
+    .hiw__step-num--cyan { color: var(--cyan); }
+    .hiw__step-num--amber { color: var(--amber); }
+    .hiw__step-num--green { color: var(--green); }
+    .hiw__step-num--red { color: var(--red); }
+    .hiw__step-title {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 28px;
+      color: var(--text-bright);
+      margin-bottom: 16px;
+      letter-spacing: -0.5px;
+    }
+    .hiw__step-body {
+      font-size: 15px;
+      color: var(--text-muted);
+      line-height: 1.8;
+      margin-bottom: 20px;
+    }
+    .hiw__step-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+    .hiw__tag {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 500;
+      padding: 5px 12px;
+      border-radius: var(--radius-pill);
+      border: 1px solid;
+    }
+    .hiw__tag--cyan { color: var(--cyan); border-color: rgba(0,229,255,0.25); background: var(--cyan-dim); }
+    .hiw__tag--amber { color: var(--amber); border-color: rgba(255,184,0,0.25); background: var(--amber-dim); }
+    .hiw__tag--green { color: var(--green); border-color: rgba(0,230,118,0.25); background: var(--green-dim); }
+    .hiw__tag--red { color: var(--red); border-color: rgba(255,61,113,0.25); background: var(--red-dim); }
+
+    /* Visual placeholder area */
+    .hiw__visual-placeholder {
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-glass);
+      background: var(--bg-card);
+      backdrop-filter: blur(20px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* ── Step 1 visual: Sensor streams ─────────────────────────── */
+    .sensor-stream {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 24px;
+      width: 100%;
+    }
+    .sensor-stream__row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 14px;
+      background: rgba(0,229,255,0.04);
+      border: 1px solid rgba(0,229,255,0.1);
+      border-radius: 8px;
+      animation: stream-slide 0.5s ease forwards;
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+    .sensor-stream__row:nth-child(1) { animation-delay: 0.1s; }
+    .sensor-stream__row:nth-child(2) { animation-delay: 0.2s; }
+    .sensor-stream__row:nth-child(3) { animation-delay: 0.3s; }
+    .sensor-stream__row:nth-child(4) { animation-delay: 0.4s; }
+    .sensor-stream__row:nth-child(5) { animation-delay: 0.5s; }
+    @keyframes stream-slide { to { opacity: 1; transform: translateX(0); } }
+    .sensor-tag {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--cyan);
+      min-width: 32px;
+    }
+    .sensor-data {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-primary);
+      flex: 1;
+    }
+    .sensor-pulse {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--cyan);
+      animation: pulse-dot 1s ease-in-out infinite;
+    }
+    .sensor-hz {
+      position: absolute;
+      bottom: 16px;
+      right: 20px;
+      display: flex;
+      align-items: baseline;
+      gap: 2px;
+    }
+    .sensor-hz__val { font-family: var(--font-mono); font-size: 32px; font-weight: 700; color: var(--cyan); }
+    .sensor-hz__unit { font-family: var(--font-mono); font-size: 13px; color: var(--text-muted); }
+
+    /* ── Step 2 visual: Neural network ─────────────────────────── */
+    .nn-viz {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      padding: 24px;
+    }
+    .nn-layer { display: flex; flex-direction: column; gap: 12px; }
+    .nn-node {
+      width: 28px; height: 28px; border-radius: 50%;
+      border: 2px solid var(--text-dim);
+      background: rgba(255,255,255,0.02);
+      transition: all 0.5s ease;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+    }
+    .nn-node--active {
+      border-color: var(--amber);
+      background: var(--amber-dim);
+      box-shadow: 0 0 12px rgba(255,184,0,0.3);
+      animation: node-pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes node-pulse {
+      0%, 100% { box-shadow: 0 0 8px rgba(255,184,0,0.2); }
+      50% { box-shadow: 0 0 20px rgba(255,184,0,0.4); }
+    }
+    .nn-node--result { width: 36px; height: 36px; font-size: 13px; }
+    .nn-node--normal { border-color: var(--green); color: var(--green); background: var(--green-dim); }
+    .nn-node--aggressive { border-color: var(--red); color: var(--red); background: var(--red-dim); }
+    .nn-node--drowsy { border-color: var(--amber); color: var(--amber); background: var(--amber-dim); }
+    .nn-connections {
+      width: 40px;
+      height: 100px;
+      background: repeating-linear-gradient(
+        180deg,
+        transparent 0, transparent 8px,
+        rgba(255,184,0,0.15) 8px, rgba(255,184,0,0.15) 10px
+      );
+      opacity: 0.5;
+    }
+    .nn-label {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    /* ── Step 3 visual: Report mockup ──────────────────────────── */
+    .report-mock {
+      padding: 20px;
+      width: 100%;
+      max-width: 280px;
+    }
+    .report-mock__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .report-mock__title {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 14px;
+      color: var(--text-bright);
+    }
+    .report-mock__badge {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--green);
+      background: var(--green-dim);
+      border: 1px solid rgba(0,230,118,0.2);
+      padding: 3px 10px;
+      border-radius: var(--radius-pill);
+    }
+    .report-mock__score-ring {
+      position: relative;
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 16px;
+    }
+    .report-mock__score-val {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 24px;
+      color: var(--green);
+    }
+    .report-mock__windows {
+      display: flex;
+      gap: 4px;
+      justify-content: center;
+    }
+    .report-mock__win {
+      width: 24px; height: 20px;
+      border-radius: 4px;
+    }
+    .report-mock__win--g { background: var(--green-dim); border: 1px solid rgba(0,230,118,0.2); }
+    .report-mock__win--a { background: var(--red-dim); border: 1px solid rgba(255,61,113,0.2); }
+    .report-mock__win--d { background: var(--amber-dim); border: 1px solid rgba(255,184,0,0.2); }
+
+    /* ── Step 4 visual: Feedback bubbles ───────────────────────── */
+    .feedback-mock {
       display: flex;
       flex-direction: column;
       gap: 12px;
-      margin-bottom: 24px;
+      padding: 20px;
+      width: 100%;
+    }
+    .feedback-mock__bubble {
+      display: flex;
+      gap: 10px;
+      padding: 12px 16px;
+      border-radius: 12px;
+      animation: bubble-in 0.5s ease forwards;
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    .feedback-mock__bubble:nth-child(1) { animation-delay: 0.2s; }
+    .feedback-mock__bubble:nth-child(2) { animation-delay: 0.5s; }
+    .feedback-mock__bubble:nth-child(3) { animation-delay: 0.8s; }
+    @keyframes bubble-in { to { opacity: 1; transform: translateY(0); } }
+    .feedback-mock__bubble--ai {
+      background: rgba(255,61,113,0.06);
+      border: 1px solid rgba(255,61,113,0.12);
+    }
+    .feedback-mock__bubble--instructor {
+      background: rgba(0,229,255,0.06);
+      border: 1px solid rgba(0,229,255,0.12);
+    }
+    .feedback-mock__icon { font-size: 16px; flex-shrink: 0; margin-top: 2px; }
+    .feedback-mock__bubble p {
+      font-size: 12px;
+      color: var(--text-primary);
+      line-height: 1.6;
+      margin: 0;
     }
 
-    .audience-card__list li {
-      font-family: var(--font-sans);
-      font-weight: 400;
-      font-size: 15px;
-      color: var(--text-muted);
+    /* Stat cards */
+    .card-stat {
       display: flex;
       align-items: center;
-      gap: 10px;
+      justify-content: center;
+      text-align: center;
+      padding: 28px 20px;
+    }
+    .card-stat__number {
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 48px;
+      color: var(--text-bright);
+      letter-spacing: -2px;
+      line-height: 1;
+    }
+    .card-stat__number--cyan { color: var(--cyan); }
+    .card-stat__number--amber { color: var(--amber); }
+    .card-stat__number--smaller { font-size: 36px; }
+    .card-stat__desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 8px;
+      line-height: 1.5;
     }
 
+    /* ══════════════════════════════════════════════════════════════
+       AUDIENCE
+       ══════════════════════════════════════════════════════════════ */
+    .audience { padding: 80px 0; position: relative; z-index: 1; }
+    .audience__grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    .audience-card {
+      padding: 32px;
+      position: relative;
+      overflow: hidden;
+    }
+    .audience-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    }
+    .audience-card--cyan::before { background: #ffe0c2; box-shadow: 0 0 20px rgba(255,224,194,0.4); }
+    .audience-card--amber::before { background: #dbb896; box-shadow: 0 0 20px rgba(219,184,150,0.4); }
+    .audience-card--green::before { background: #b8926e; box-shadow: 0 0 20px rgba(184,146,110,0.4); }
+
+    .audience-card__emoji { font-size: 36px; display: block; margin-bottom: 16px; margin-top: 8px; }
+    .audience-card__title {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 20px;
+      color: var(--text-bright);
+      margin-bottom: 16px;
+    }
+    .audience-card__list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-bottom: 24px;
+    }
+    .audience-card__list li {
+      font-size: 14px;
+      color: var(--text-muted);
+      padding-left: 20px;
+      position: relative;
+    }
     .audience-card__list li::before {
       content: '';
+      position: absolute;
+      left: 0;
+      top: 9px;
       width: 6px;
       height: 6px;
       border-radius: 50%;
-      flex-shrink: 0;
     }
-
-    .audience-card--blue .audience-card__list li::before { background: var(--primary-blue); }
-    .audience-card--purple .audience-card__list li::before { background: var(--accent-purple); }
-    .audience-card--green .audience-card__list li::before { background: var(--success-green); }
+    .audience-card--cyan .audience-card__list li::before { background: #ffe0c2; }
+    .audience-card--amber .audience-card__list li::before { background: #dbb896; }
+    .audience-card--green .audience-card__list li::before { background: #b8926e; }
 
     .audience-card__link {
-      font-family: var(--font-sans);
+      font-family: var(--font-display);
       font-weight: 600;
-      font-size: 15px;
+      font-size: 14px;
       transition: opacity 0.2s ease;
     }
+    .audience-card__link:hover { opacity: 0.8; }
+    .audience-card__link--cyan { color: #ffe0c2; }
+    .audience-card__link--amber { color: #dbb896; }
+    .audience-card__link--green { color: #b8926e; }
 
-    .audience-card__link:hover {
-      opacity: 0.75;
-    }
-
-    .audience-card__link--blue { color: var(--primary-blue); }
-    .audience-card__link--purple { color: var(--accent-purple); }
-    .audience-card__link--green { color: var(--success-green); }
-
-    /* ========== Testimonial ========== */
-    .testimonial {
-      padding: 80px 0;
-    }
-
+    /* ══════════════════════════════════════════════════════════════
+       TESTIMONIAL
+       ══════════════════════════════════════════════════════════════ */
+    .testimonial { padding: 40px 0 80px; position: relative; z-index: 1; }
     .testimonial__card {
-      max-width: 800px;
+      max-width: 700px;
       margin: 0 auto;
       text-align: center;
-      padding: 48px;
+      padding: 48px 40px;
+      position: relative;
     }
-
-    .testimonial__quote-mark {
-      font-family: var(--font-sans);
-      font-weight: 800;
+    .testimonial__card::before {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      border-radius: var(--radius-lg);
+      background: linear-gradient(135deg, var(--cyan-dim), transparent 50%, var(--amber-dim));
+      z-index: -1;
+    }
+    .testimonial__quote {
       font-size: 72px;
-      color: var(--border-color);
       line-height: 1;
+      color: var(--text-dim);
+      font-family: Georgia, serif;
       margin-bottom: 8px;
     }
-
     .testimonial__text {
-      font-family: var(--font-sans);
+      font-family: var(--font-display);
       font-weight: 400;
+      font-size: 18px;
+      color: var(--text-primary);
+      line-height: 1.8;
+      margin-bottom: 24px;
       font-style: italic;
-      font-size: 22px;
-      color: var(--text-primary);
-      line-height: 1.6;
-      margin-bottom: 32px;
     }
-
     .testimonial__name {
-      font-family: var(--font-sans);
+      font-family: var(--font-display);
       font-weight: 700;
-      font-size: 16px;
-      color: var(--text-primary);
-      margin-bottom: 4px;
+      font-size: 15px;
+      color: var(--text-bright);
     }
-
     .testimonial__role {
-      font-family: var(--font-sans);
-      font-weight: 400;
-      font-size: 14px;
+      font-size: 13px;
       color: var(--text-muted);
-      margin-bottom: 12px;
+      margin-top: 4px;
     }
-
     .testimonial__stars {
-      font-size: 20px;
+      margin-top: 12px;
+      font-size: 16px;
       color: var(--amber);
-      letter-spacing: 2px;
+      letter-spacing: 4px;
     }
 
-    /* ========== Final CTA ========== */
+    /* ══════════════════════════════════════════════════════════════
+       FINAL CTA
+       ══════════════════════════════════════════════════════════════ */
     .final-cta {
-      background: var(--card-bg);
-      padding: 100px 24px;
+      padding: 80px 24px;
       text-align: center;
+      position: relative;
+      z-index: 1;
     }
-
     .final-cta__inner {
       max-width: 600px;
       margin: 0 auto;
+      padding: 64px 40px;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-glass);
+      background: linear-gradient(135deg, rgba(0,229,255,0.04), rgba(255,184,0,0.04));
+      position: relative;
+      overflow: hidden;
     }
-
+    .final-cta__inner::before {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      border-radius: var(--radius-lg);
+      background: linear-gradient(135deg, var(--cyan), #b08968);
+      opacity: 0.08;
+      z-index: -1;
+    }
     .final-cta__title {
-      font-family: var(--font-sans);
-      font-weight: 700;
-      font-size: 36px;
-      color: var(--text-primary);
-      line-height: 1.25;
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 32px;
+      color: var(--text-bright);
+      letter-spacing: -1px;
+      line-height: 1.2;
       margin-bottom: 16px;
     }
-
     .final-cta__subtitle {
-      font-family: var(--font-sans);
-      font-weight: 400;
-      font-size: 17px;
+      font-size: 15px;
       color: var(--text-muted);
-      margin-bottom: 36px;
+      margin-bottom: 32px;
     }
-
     .final-cta__demo {
       display: block;
       margin-top: 16px;
-      font-family: var(--font-sans);
+      font-family: var(--font-display);
       font-weight: 600;
-      font-size: 15px;
+      font-size: 14px;
       color: var(--text-muted);
       transition: color 0.2s ease;
     }
+    .final-cta__demo:hover { color: var(--cyan); }
 
-    .final-cta__demo:hover {
-      color: var(--text-primary);
-    }
-
-    /* ========== Footer ========== */
+    /* ══════════════════════════════════════════════════════════════
+       FOOTER
+       ══════════════════════════════════════════════════════════════ */
     .footer {
-      background: var(--footer-bg);
-      padding: 24px 0;
+      padding: 32px 0;
+      border-top: 1px solid var(--border-glass);
+      position: relative;
+      z-index: 1;
     }
-
     .footer__inner {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
     }
-
     .footer__logo {
-      font-family: var(--font-sans);
+      font-family: var(--font-display);
       font-weight: 800;
-      font-size: 16px;
-      color: var(--text-primary);
+      font-size: 18px;
+      color: var(--text-bright);
     }
-
-    .footer__links {
-      display: flex;
-      gap: 24px;
-    }
-
+    .footer__links { display: flex; gap: 24px; }
     .footer__link {
-      font-family: var(--font-sans);
-      font-weight: 400;
-      font-size: 14px;
+      font-size: 13px;
       color: var(--text-muted);
       transition: color 0.2s ease;
     }
-
-    .footer__link:hover {
-      color: var(--text-primary);
-    }
-
+    .footer__link:hover { color: var(--text-primary); }
     .footer__copy {
-      font-family: var(--font-sans);
-      font-weight: 400;
-      font-size: 14px;
-      color: var(--text-muted);
+      font-size: 12px;
+      color: var(--text-dim);
     }
 
-    /* ========== Responsive — Tablet (768px) ========== */
-    @media (max-width: 1024px) {
-      .hero__headline {
-        font-size: 52px;
-      }
-
-      .bento__grid {
-        grid-template-columns: repeat(2, 1fr);
-      }
-
-      .card-a {
-        grid-column: span 2;
-      }
-
-      .card-b {
-        grid-column: span 1;
-      }
-
-      .card-c {
-        grid-column: span 1;
-      }
-
-      .card-d {
-        grid-column: span 2;
-      }
-
-      .card-e, .card-f, .card-g {
-        grid-column: span 1;
-      }
-
-      .card-g {
-        grid-column: span 2;
-      }
-
-      .audience__grid {
-        grid-template-columns: repeat(2, 1fr);
-      }
-
-      .audience__grid > :last-child {
-        grid-column: span 2;
-        max-width: 50%;
-        justify-self: center;
-      }
-    }
-
-    /* ========== Responsive — Mobile (768px) ========== */
+    /* ══════════════════════════════════════════════════════════════
+       RESPONSIVE
+       ══════════════════════════════════════════════════════════════ */
     @media (max-width: 768px) {
-      .hero {
-        padding: 80px 24px 60px;
-      }
-
-      .hero__headline {
-        font-size: 40px;
-        letter-spacing: -2px;
-      }
-
-      .hero__subtitle {
-        font-size: 17px;
-      }
-
-      .nav__links {
-        display: none;
-      }
-
-      .nav__hamburger {
-        display: flex;
-      }
-
-      .bento__grid {
-        grid-template-columns: 1fr;
-      }
-
-      .card-a,
-      .card-d,
-      .card-g {
-        grid-column: span 1;
-      }
-
-      .steps-flow {
-        flex-direction: column;
-        gap: 20px;
-      }
-
-      .step-connector {
-        border-top: none;
-        border-left: 2px dashed var(--border-color);
-        height: 24px;
-        margin-top: 0;
-        align-self: center;
-      }
-
-      .score-ring {
-        bottom: -10px;
-        right: 16px;
-        width: 100px;
-        height: 100px;
-      }
-
-      .score-ring::before {
-        width: 72px;
-        height: 72px;
-      }
-
-      .score-ring__value {
-        font-size: 26px;
-      }
-
-      .card-stat__number {
-        font-size: 48px;
-      }
-
-      .card-stat__number--smaller {
-        font-size: 40px;
-      }
-
-      .audience__grid {
-        grid-template-columns: 1fr;
-      }
-
-      .audience__grid > :last-child {
-        grid-column: span 1;
-        max-width: 100%;
-      }
-
-      .testimonial__text {
-        font-size: 18px;
-      }
-
-      .testimonial__card {
-        padding: 24px;
-      }
-
-      .final-cta__title {
-        font-size: 28px;
-      }
-
-      .footer__inner {
-        flex-direction: column;
-        gap: 12px;
-        text-align: center;
-      }
-
-      .section-title {
-        font-size: 26px;
-      }
+      .nav__links { display: none; }
+      .nav__hamburger { display: flex; }
+      .hero { padding: 120px 24px 60px; }
+      .hero__headline { letter-spacing: -1.5px; }
+      .bento__grid { grid-template-columns: 1fr; }
+      .card-a { grid-column: span 1; }
+      .audience__grid { grid-template-columns: 1fr; }
+      .section-title { font-size: 28px; }
+      .final-cta__inner { padding: 40px 24px; }
+      .final-cta__title { font-size: 26px; }
+      .footer__inner { flex-direction: column; text-align: center; }
+      .testimonial__card { padding: 32px 24px; }
+      .hiw__step { grid-template-columns: 1fr; gap: 24px; min-height: auto; padding: 40px 24px; }
+      .hiw__step:nth-child(even) .hiw__step-visual { order: 0; }
+      .hiw__step-visual { order: -1; }
+      .hiw__title { font-size: 30px; }
+      .hiw__step-title { font-size: 22px; }
+      .hiw__step-num { font-size: 40px; }
+      .hiw__visual-placeholder { aspect-ratio: 3 / 2; }
+      .hiw__header-wrap { top: 0; padding: 32px 0 20px; }
     }
   </style>
 </head>
 <body>
 
+  <!-- Grid background with cursor hover reveal -->
+  <div class="grid-bg" id="gridBg">
+    <div class="grid-bg__base">
+      <svg width="100%" height="100%">
+        <defs><pattern id="grid-base" width="40" height="40" patternUnits="userSpaceOnUse">
+          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="currentColor" stroke-width="0.8" style="color:var(--grid-color)"/>
+        </pattern></defs>
+        <rect width="100%" height="100%" fill="url(#grid-base)"/>
+      </svg>
+    </div>
+    <div class="grid-bg__hover" id="gridHover">
+      <svg width="100%" height="100%">
+        <defs><pattern id="grid-hover" width="40" height="40" patternUnits="userSpaceOnUse">
+          <path d="M 40 0 L 0 0 0 40" fill="none" stroke="currentColor" stroke-width="1" style="color:var(--grid-hover-color)"/>
+        </pattern></defs>
+        <rect width="100%" height="100%" fill="url(#grid-hover)"/>
+      </svg>
+    </div>
+  </div>
+
   <!-- ==================== Navigation ==================== -->
-  <nav class="nav">
-    <div class="container nav__inner">
-      <a href="#" class="nav__logo">DriveIQ</a>
-      <div class="nav__links">
-        <a href="#features" class="nav__link">Features</a>
-        <a href="#about" class="nav__link">About</a>
-        <a href="#contact" class="nav__link">Contact</a>
-        <a href="#" class="btn-dark nav__cta">Book a Demo</a>
+  <nav class="nav" id="mainNav">
+    <div class="nav__bar">
+      <div class="nav__inner">
+        <a href="#" class="nav__logo">Drive<span>IQ</span></a>
+        <div class="nav__links">
+          <a href="#features" class="nav__link">Features</a>
+          <a href="#how-it-works" class="nav__link">How It Works</a>
+          <a href="#about" class="nav__link">About</a>
+          <a href="#contact" class="nav__link">Contact</a>
+          <div class="nav__link-group">
+            <a href="#" class="btn-outline nav__cta-expanded" style="padding:8px 20px;font-size:13px;">Log In</a>
+            <a href="#" class="btn-primary nav__cta-expanded" style="padding:8px 20px;font-size:13px;">Sign Up</a>
+            <a href="#" class="btn-primary nav__cta-compact" style="padding:8px 20px;font-size:13px;">Get Started</a>
+          </div>
+        </div>
+        <button class="nav__hamburger" onclick="toggleMobileMenu()" aria-label="Menu">
+          <span></span><span></span><span></span>
+        </button>
       </div>
-      <button class="nav__hamburger" onclick="toggleMobileMenu()" aria-label="Toggle menu">
-        <span></span>
-        <span></span>
-        <span></span>
-      </button>
     </div>
     <div class="nav__mobile-menu" id="mobileMenu">
       <a href="#features">Features</a>
+      <a href="#how-it-works">How It Works</a>
       <a href="#about">About</a>
       <a href="#contact">Contact</a>
-      <a href="#" class="btn-dark" style="text-align:center;">Book a Demo</a>
+      <a href="#" class="btn-primary" style="text-align:center">Get Started</a>
     </div>
   </nav>
 
   <!-- ==================== Hero ==================== -->
   <section class="hero">
-    <div class="hero__inner">
+    <div class="hero__inner reveal">
       <p class="hero__overline">Driving Intelligence</p>
       <h1 class="hero__headline">
-        Your AI-Powered<br>Driving Coach
+        Your <em>AI-Powered</em><br>Driving Coach
       </h1>
       <p class="hero__subtitle">
         Analyze driving behavior in real-time. Score performance with ML precision. Improve with every session.
       </p>
       <div class="hero__cta-wrap">
-        <a href="#" class="btn-dark btn-dark--large">Start Analyzing &rarr;</a>
+        <a href="#" class="btn-primary btn-primary--large">Start Analyzing</a>
+        <a href="#how-it-works" class="btn-outline">See How It Works</a>
       </div>
       <p class="hero__note">No credit card required &middot; Free for students</p>
+
+      <!-- Gauge decoration -->
+      <div class="hero__gauge">
+        <div class="gauge-display">
+          <svg viewBox="0 0 200 120">
+            <defs>
+              <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#e54d2e"/>
+                <stop offset="40%" stop-color="#ffdfb5"/>
+                <stop offset="100%" stop-color="#00E676"/>
+              </linearGradient>
+            </defs>
+            <path d="M 20 110 A 80 80 0 0 1 180 110" class="gauge-arc"/>
+            <path d="M 20 110 A 80 80 0 0 1 180 110" class="gauge-arc-fill"/>
+          </svg>
+          <span class="gauge-value">85</span>
+          <span class="gauge-label">Score</span>
+        </div>
+      </div>
     </div>
   </section>
+
+  <div class="road-divider"><div class="road-divider__line"></div></div>
 
   <!-- ==================== Bento Feature Grid ==================== -->
   <section class="bento" id="features">
     <div class="container">
-      <p class="section-label">Platform</p>
+      <p class="section-label reveal">Platform</p>
       <div class="bento__grid">
 
         <!-- Card A: Real-time Behavior Analysis -->
-        <div class="bento-card card-a">
+        <div class="bento-card glass card-a reveal" style="animation-delay:0.1s">
           <h3 class="bento-card__title">Real-time Behavior Analysis</h3>
           <p class="bento-card__body">
             LSTM neural networks process 39 sensor features to classify driving behavior in real-time across 4-minute analysis windows.
           </p>
-          <div class="score-ring">
-            <span class="score-ring__value">85</span>
+          <div class="score-gauge">
+            <div class="score-gauge__ring">
+              <svg viewBox="0 0 80 80">
+                <circle cx="40" cy="40" r="35" class="score-gauge__track"/>
+                <circle cx="40" cy="40" r="35" class="score-gauge__fill"/>
+              </svg>
+              <span class="score-gauge__value">85</span>
+            </div>
+            <div class="score-gauge__meta">
+              <strong>Excellent</strong> driving detected<br>
+              Session confidence: 94%
+            </div>
           </div>
         </div>
 
         <!-- Card B: Smart Alerts -->
-        <div class="bento-card card-b">
-          <span class="card-b__emoji">&#9889;</span>
+        <div class="bento-card glass card-b reveal" style="animation-delay:0.2s">
           <h3 class="bento-card__title">Smart Alerts</h3>
           <p class="bento-card__body">
             Instant notifications when risky patterns are detected. KNN anomaly scoring flags harsh driving, overspeeding, and tailgating.
           </p>
-          <div class="alert-pill">
-            <span class="alert-pill__dot"></span>
+          <div class="alert-indicator">
+            <span class="alert-indicator__dot"></span>
             4 alerts detected
           </div>
         </div>
 
         <!-- Card C: Session Reports -->
-        <div class="bento-card card-c">
-          <span class="card-c__emoji">&#128202;</span>
+        <div class="bento-card glass card-c reveal" style="animation-delay:0.15s">
           <h3 class="bento-card__title">Session Reports</h3>
           <p class="bento-card__body">
-            Detailed window-by-window analysis of every driving session with behavior breakdowns and scoring trends.
+            Detailed window-by-window analysis with behavior breakdowns and AI-generated feedback.
           </p>
-          <div class="mini-chart">
-            <div class="mini-chart__row">
-              <span class="mini-chart__label">Normal</span>
-              <div class="mini-chart__bar-track">
-                <div class="mini-chart__bar-fill mini-chart__bar-fill--green"></div>
-              </div>
-              <span class="mini-chart__value">72%</span>
+          <div class="hud-bars">
+            <div class="hud-bar">
+              <span class="hud-bar__label">Normal</span>
+              <div class="hud-bar__track"><div class="hud-bar__fill hud-bar__fill--green"></div></div>
+              <span class="hud-bar__val">72%</span>
             </div>
-            <div class="mini-chart__row">
-              <span class="mini-chart__label">Caution</span>
-              <div class="mini-chart__bar-track">
-                <div class="mini-chart__bar-fill mini-chart__bar-fill--amber"></div>
-              </div>
-              <span class="mini-chart__value">18%</span>
+            <div class="hud-bar">
+              <span class="hud-bar__label">Caution</span>
+              <div class="hud-bar__track"><div class="hud-bar__fill hud-bar__fill--amber"></div></div>
+              <span class="hud-bar__val">18%</span>
             </div>
-            <div class="mini-chart__row">
-              <span class="mini-chart__label">Risky</span>
-              <div class="mini-chart__bar-track">
-                <div class="mini-chart__bar-fill mini-chart__bar-fill--red"></div>
-              </div>
-              <span class="mini-chart__value">10%</span>
+            <div class="hud-bar">
+              <span class="hud-bar__label">Risky</span>
+              <div class="hud-bar__track"><div class="hud-bar__fill hud-bar__fill--red"></div></div>
+              <span class="hud-bar__val">10%</span>
             </div>
           </div>
         </div>
 
-        <!-- Card D: How It Works -->
-        <div class="bento-card card-d">
-          <h3 class="bento-card__title">How It Works</h3>
-          <p class="bento-card__body">From raw sensor data to actionable improvement insights in four steps.</p>
-          <div class="steps-flow">
-            <div class="step">
-              <div class="step__circle step__circle--blue">01</div>
-              <span class="step__label">Capture</span>
-            </div>
-            <div class="step-connector"></div>
-            <div class="step">
-              <div class="step__circle step__circle--purple">02</div>
-              <span class="step__label">Analyze</span>
-            </div>
-            <div class="step-connector"></div>
-            <div class="step">
-              <div class="step__circle step__circle--amber">03</div>
-              <span class="step__label">Score</span>
-            </div>
-            <div class="step-connector"></div>
-            <div class="step">
-              <div class="step__circle step__circle--green">04</div>
-              <span class="step__label">Improve</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Card E: Stat 39 -->
-        <div class="bento-card card-stat card-e">
+        <!-- Stat Cards -->
+        <div class="bento-card glass card-stat reveal" style="animation-delay:0.3s">
           <div>
-            <div class="card-stat__number">39</div>
-            <p class="card-stat__desc">Sensor features analyzed per session</p>
+            <div class="card-stat__number card-stat__number--cyan">39</div>
+            <p class="card-stat__desc">Sensor features analyzed<br>per session</p>
           </div>
         </div>
 
-        <!-- Card F: Stat 10 Hz -->
-        <div class="bento-card card-stat card-f">
+        <div class="bento-card glass card-stat reveal" style="animation-delay:0.35s">
           <div>
-            <div class="card-stat__number card-stat__number--smaller">10 Hz</div>
-            <p class="card-stat__desc">Real-time data frequency</p>
+            <div class="card-stat__number card-stat__number--smaller card-stat__number--amber">10 Hz</div>
+            <p class="card-stat__desc">Real-time data<br>frequency</p>
           </div>
         </div>
 
-        <!-- Card G: Stat 4 min -->
-        <div class="bento-card card-stat card-g">
+        <div class="bento-card glass card-stat reveal" style="animation-delay:0.4s">
           <div>
             <div class="card-stat__number card-stat__number--smaller">4 min</div>
-            <p class="card-stat__desc">Analysis window duration</p>
+            <p class="card-stat__desc">Analysis window<br>duration</p>
+          </div>
+        </div>
+
+        <div class="bento-card glass card-stat reveal" style="animation-delay:0.45s">
+          <div>
+            <div class="card-stat__number card-stat__number--smaller" style="color:var(--green)">3</div>
+            <p class="card-stat__desc">Behavior classes<br>Normal · Aggressive · Drowsy</p>
           </div>
         </div>
 
@@ -1101,16 +1374,193 @@
     </div>
   </section>
 
+  <!-- ==================== How It Works — Cinematic Scroll ==================== -->
+  <section class="hiw" id="how-it-works">
+    <div class="hiw__header-wrap">
+      <div class="container">
+        <div class="hiw__header">
+          <p class="hiw__label">The Pipeline</p>
+          <h2 class="hiw__title">How It Works</h2>
+          <p class="hiw__sub">From raw sensor data to actionable improvement insights</p>
+        </div>
+        <div class="hiw__progress">
+          <div class="hiw__progress-fill" id="hiwProgressFill"></div>
+          <div class="hiw__progress-dots">
+            <span class="hiw__dot hiw__dot--cyan"></span>
+            <span class="hiw__dot hiw__dot--amber"></span>
+            <span class="hiw__dot hiw__dot--green"></span>
+            <span class="hiw__dot hiw__dot--red"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="hiw__steps-list">
+        <!-- Step 1: Capture -->
+        <div class="hiw__step">
+          <div class="hiw__step-visual">
+            <div class="hiw__visual-placeholder hiw__visual--capture">
+              <!-- Animated sensor data streams -->
+              <div class="sensor-stream">
+                <div class="sensor-stream__row"><span class="sensor-tag">GPS</span><span class="sensor-data">40.5053, -3.3572</span><span class="sensor-pulse"></span></div>
+                <div class="sensor-stream__row"><span class="sensor-tag">ACC</span><span class="sensor-data">0.12, 9.78, -0.34</span><span class="sensor-pulse"></span></div>
+                <div class="sensor-stream__row"><span class="sensor-tag">SPD</span><span class="sensor-data">87.3 km/h</span><span class="sensor-pulse"></span></div>
+                <div class="sensor-stream__row"><span class="sensor-tag">LAN</span><span class="sensor-data">0.42m offset</span><span class="sensor-pulse"></span></div>
+                <div class="sensor-stream__row"><span class="sensor-tag">TTC</span><span class="sensor-data">3.2s front</span><span class="sensor-pulse"></span></div>
+              </div>
+              <div class="sensor-hz">
+                <span class="sensor-hz__val">10</span>
+                <span class="sensor-hz__unit">Hz</span>
+              </div>
+            </div>
+          </div>
+          <div class="hiw__step-content">
+            <div class="hiw__step-num hiw__step-num--cyan">01</div>
+            <h3 class="hiw__step-title">Capture</h3>
+            <p class="hiw__step-body">
+              Five sensor streams — GPS, accelerometer, lane detection, vehicle proximity, and road data — are captured simultaneously at 10Hz frequency, producing thousands of data points per minute of driving.
+            </p>
+            <div class="hiw__step-tags">
+              <span class="hiw__tag hiw__tag--cyan">GPS Positioning</span>
+              <span class="hiw__tag hiw__tag--cyan">Accelerometer</span>
+              <span class="hiw__tag hiw__tag--cyan">Lane Detection</span>
+              <span class="hiw__tag hiw__tag--cyan">Vehicle Proximity</span>
+              <span class="hiw__tag hiw__tag--cyan">Road Mapping</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2: Analyze -->
+        <div class="hiw__step">
+          <div class="hiw__step-visual">
+            <div class="hiw__visual-placeholder hiw__visual--analyze">
+              <!-- Neural network visualization -->
+              <div class="nn-viz">
+                <div class="nn-layer nn-layer--input">
+                  <div class="nn-node"></div><div class="nn-node"></div><div class="nn-node"></div>
+                  <div class="nn-node"></div><div class="nn-node"></div>
+                </div>
+                <div class="nn-connections"></div>
+                <div class="nn-layer nn-layer--hidden">
+                  <div class="nn-node nn-node--active"></div><div class="nn-node nn-node--active"></div>
+                  <div class="nn-node"></div><div class="nn-node nn-node--active"></div>
+                </div>
+                <div class="nn-connections"></div>
+                <div class="nn-layer nn-layer--output">
+                  <div class="nn-node nn-node--result nn-node--normal">N</div>
+                  <div class="nn-node nn-node--result nn-node--aggressive">A</div>
+                  <div class="nn-node nn-node--result nn-node--drowsy">D</div>
+                </div>
+              </div>
+              <div class="nn-label">LSTM + KNN Classification</div>
+            </div>
+          </div>
+          <div class="hiw__step-content">
+            <div class="hiw__step-num hiw__step-num--amber">02</div>
+            <h3 class="hiw__step-title">Analyze</h3>
+            <p class="hiw__step-body">
+              Raw sensor data is preprocessed into 39 engineered features, then fed through LSTM neural networks for behavior classification. KNN anomaly detection identifies risky patterns like harsh braking, overspeeding, and tailgating.
+            </p>
+            <div class="hiw__step-tags">
+              <span class="hiw__tag hiw__tag--amber">39 Features</span>
+              <span class="hiw__tag hiw__tag--amber">LSTM Networks</span>
+              <span class="hiw__tag hiw__tag--amber">KNN Anomaly Detection</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3: Score -->
+        <div class="hiw__step">
+          <div class="hiw__step-visual">
+            <div class="hiw__visual-placeholder hiw__visual--score">
+              <!-- Report mockup -->
+              <div class="report-mock">
+                <div class="report-mock__header">
+                  <span class="report-mock__title">Session Report</span>
+                  <span class="report-mock__badge">Motorway</span>
+                </div>
+                <div class="report-mock__score-ring">
+                  <svg viewBox="0 0 80 80" width="80" height="80">
+                    <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="5"/>
+                    <circle cx="40" cy="40" r="34" fill="none" stroke="var(--green)" stroke-width="5" stroke-linecap="round"
+                      stroke-dasharray="214" stroke-dashoffset="43" transform="rotate(-90 40 40)"
+                      style="transition: stroke-dashoffset 1.5s ease"/>
+                  </svg>
+                  <span class="report-mock__score-val">82</span>
+                </div>
+                <div class="report-mock__windows">
+                  <div class="report-mock__win report-mock__win--g"></div>
+                  <div class="report-mock__win report-mock__win--g"></div>
+                  <div class="report-mock__win report-mock__win--a"></div>
+                  <div class="report-mock__win report-mock__win--g"></div>
+                  <div class="report-mock__win report-mock__win--g"></div>
+                  <div class="report-mock__win report-mock__win--d"></div>
+                  <div class="report-mock__win report-mock__win--g"></div>
+                  <div class="report-mock__win report-mock__win--g"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="hiw__step-content">
+            <div class="hiw__step-num hiw__step-num--green">03</div>
+            <h3 class="hiw__step-title">Score</h3>
+            <p class="hiw__step-body">
+              Each 4-minute window receives a classification — Normal, Aggressive, or Drowsy. Window-level severity scores, alert causes, and trigger features combine into an overall performance score for the session.
+            </p>
+            <div class="hiw__step-tags">
+              <span class="hiw__tag hiw__tag--green">Performance Score</span>
+              <span class="hiw__tag hiw__tag--green">Window Timeline</span>
+              <span class="hiw__tag hiw__tag--green">Severity Mapping</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 4: Improve -->
+        <div class="hiw__step">
+          <div class="hiw__step-visual">
+            <div class="hiw__visual-placeholder hiw__visual--improve">
+              <!-- AI feedback mockup -->
+              <div class="feedback-mock">
+                <div class="feedback-mock__bubble feedback-mock__bubble--ai">
+                  <span class="feedback-mock__icon">&#10024;</span>
+                  <p>Your steering showed instability during windows 3-5. Focus on smoother inputs through curves.</p>
+                </div>
+                <div class="feedback-mock__bubble feedback-mock__bubble--instructor">
+                  <span class="feedback-mock__icon">&#128221;</span>
+                  <p>Good improvement since last session. Lane positioning was much better on the motorway.</p>
+                </div>
+                <div class="feedback-mock__bubble feedback-mock__bubble--ai">
+                  <span class="feedback-mock__icon">&#10024;</span>
+                  <p>Overall performance score of 82 reflects strong driving ability. Keep up the consistency!</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="hiw__step-content">
+            <div class="hiw__step-num hiw__step-num--red">04</div>
+            <h3 class="hiw__step-title">Improve</h3>
+            <p class="hiw__step-body">
+              GPT-4o generates personalized, evidence-based feedback for every flagged window and the overall session. Students get actionable advice, instructors get teaching insights — all grounded in the actual sensor data.
+            </p>
+            <div class="hiw__step-tags">
+              <span class="hiw__tag hiw__tag--red">AI Feedback</span>
+              <span class="hiw__tag hiw__tag--red">Per-Window Analysis</span>
+              <span class="hiw__tag hiw__tag--red">Instructor Notes</span>
+            </div>
+          </div>
+        </div>
+    </div>
+  </section>
+
+  <div class="road-divider"><div class="road-divider__line"></div></div>
+
   <!-- ==================== Audience Section ==================== -->
   <section class="audience" id="about">
     <div class="container">
-      <p class="section-label">For Everyone</p>
-      <h2 class="section-title">Built for the entire<br>driving ecosystem</h2>
+      <p class="section-label reveal">For Everyone</p>
+      <h2 class="section-title reveal">Built for the entire<br>driving ecosystem</h2>
       <div class="audience__grid">
 
-        <!-- For Students -->
-        <div class="audience-card audience-card--blue">
-          <div class="audience-card__bar audience-card__bar--blue"></div>
+        <div class="audience-card glass audience-card--cyan reveal" style="animation-delay:0.1s">
           <span class="audience-card__emoji">&#127891;</span>
           <h3 class="audience-card__title">For Students</h3>
           <ul class="audience-card__list">
@@ -1119,12 +1569,10 @@
             <li>Review sessions</li>
             <li>Earn badges</li>
           </ul>
-          <a href="#" class="audience-card__link audience-card__link--blue">Start learning &rarr;</a>
+          <a href="#" class="audience-card__link audience-card__link--cyan">Start learning &rarr;</a>
         </div>
 
-        <!-- For Instructors -->
-        <div class="audience-card audience-card--purple">
-          <div class="audience-card__bar audience-card__bar--purple"></div>
+        <div class="audience-card glass audience-card--amber reveal" style="animation-delay:0.2s">
           <span class="audience-card__emoji">&#128104;&#8205;&#127979;</span>
           <h3 class="audience-card__title">For Instructors</h3>
           <ul class="audience-card__list">
@@ -1133,12 +1581,10 @@
             <li>Add session notes</li>
             <li>View analytics</li>
           </ul>
-          <a href="#" class="audience-card__link audience-card__link--purple">Start teaching &rarr;</a>
+          <a href="#" class="audience-card__link audience-card__link--amber">Start teaching &rarr;</a>
         </div>
 
-        <!-- For Schools -->
-        <div class="audience-card audience-card--green">
-          <div class="audience-card__bar audience-card__bar--green"></div>
+        <div class="audience-card glass audience-card--green reveal" style="animation-delay:0.3s">
           <span class="audience-card__emoji">&#127979;</span>
           <h3 class="audience-card__title">For Schools</h3>
           <ul class="audience-card__list">
@@ -1157,8 +1603,8 @@
   <!-- ==================== Testimonial ==================== -->
   <section class="testimonial">
     <div class="container">
-      <div class="testimonial__card">
-        <div class="testimonial__quote-mark">&ldquo;</div>
+      <div class="testimonial__card glass reveal">
+        <div class="testimonial__quote">&ldquo;</div>
         <p class="testimonial__text">
           DriveIQ transformed how I teach. I can now pinpoint exactly where my students need improvement, backed by real data instead of gut feeling.
         </p>
@@ -1169,12 +1615,14 @@
     </div>
   </section>
 
+  <div class="road-divider"><div class="road-divider__line"></div></div>
+
   <!-- ==================== Final CTA ==================== -->
   <section class="final-cta" id="contact">
-    <div class="final-cta__inner">
+    <div class="final-cta__inner reveal">
       <h2 class="final-cta__title">Start your journey to<br>safer driving today</h2>
       <p class="final-cta__subtitle">Join hundreds of students and instructors already using DriveIQ</p>
-      <a href="#" class="btn-dark btn-dark--large">Get Started Free</a>
+      <a href="#" class="btn-primary btn-primary--large">Get Started Free</a>
       <a href="#" class="final-cta__demo">Book a Demo</a>
     </div>
   </section>
@@ -1192,20 +1640,132 @@
     </div>
   </footer>
 
-  <!-- ==================== Mobile Menu Script ==================== -->
+  <!-- ==================== Scripts ==================== -->
   <script>
     function toggleMobileMenu() {
-      var menu = document.getElementById('mobileMenu');
-      menu.classList.toggle('active');
+      document.getElementById('mobileMenu').classList.toggle('active');
     }
-
-    // Close mobile menu when a link is clicked
     document.querySelectorAll('.nav__mobile-menu a').forEach(function(link) {
       link.addEventListener('click', function() {
         document.getElementById('mobileMenu').classList.remove('active');
       });
     });
-  </script>
 
+    // ── Navbar expand/contract on scroll ────────────────────────
+    (function() {
+      var nav = document.getElementById('mainNav');
+      var scrolled = false;
+      window.addEventListener('scroll', function() {
+        var now = window.scrollY > 50;
+        if (now !== scrolled) {
+          scrolled = now;
+          if (scrolled) nav.classList.add('scrolled');
+          else nav.classList.remove('scrolled');
+        }
+      }, { passive: true });
+    })();
+
+    // ── Grid cursor hover reveal ────────────────────────────────
+    (function() {
+      var hover = document.getElementById('gridHover');
+      if (!hover) return;
+      document.addEventListener('mousemove', function(e) {
+        hover.style.maskImage = 'radial-gradient(300px circle at ' + e.clientX + 'px ' + e.clientY + 'px, black, transparent)';
+        hover.style.webkitMaskImage = 'radial-gradient(300px circle at ' + e.clientX + 'px ' + e.clientY + 'px, black, transparent)';
+      }, { passive: true });
+    })();
+
+    // Scroll reveal
+    var observer = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.reveal').forEach(function(el) {
+      observer.observe(el);
+    });
+
+    // ── How It Works scroll controller ────────────────────────
+    // How It Works — step reveals + progress bar
+    (function() {
+      var hiw = document.querySelector('.hiw');
+      var steps = document.querySelectorAll('.hiw__step');
+      var dots = document.querySelectorAll('.hiw__dot');
+      var progressFill = document.getElementById('hiwProgressFill');
+      var totalSteps = steps.length;
+
+      // Reveal steps as they enter viewport
+      var stepObserver = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('in-view');
+          }
+        });
+      }, { threshold: 0.15, rootMargin: '0px 0px -80px 0px' });
+
+      steps.forEach(function(step) { stepObserver.observe(step); });
+
+      // Update progress bar based on which steps are in view
+      function updateProgress() {
+        if (!hiw) return;
+        var sectionTop = hiw.offsetTop;
+        var sectionHeight = hiw.offsetHeight;
+        var viewportH = window.innerHeight;
+        var scrollInSection = window.scrollY - sectionTop;
+        var scrollableRange = sectionHeight - viewportH;
+
+        if (scrollInSection < 0 || scrollableRange <= 0) {
+          if (progressFill) progressFill.style.width = '0%';
+          dots.forEach(function(d) { d.classList.remove('active'); });
+          return;
+        }
+
+        var progress = Math.max(0, Math.min(1, scrollInSection / scrollableRange));
+        if (progressFill) progressFill.style.width = (progress * 100) + '%';
+
+        // Activate dots based on which steps have been revealed
+        var activeCount = document.querySelectorAll('.hiw__step.in-view').length;
+        dots.forEach(function(d, i) {
+          if (i < activeCount) d.classList.add('active');
+          else d.classList.remove('active');
+        });
+      }
+
+      window.addEventListener('scroll', updateProgress, { passive: true });
+      updateProgress();
+    })();
+
+    // Odometer counter animation for stat numbers
+    document.querySelectorAll('.card-stat__number').forEach(function(el) {
+      var text = el.textContent.trim();
+      var num = parseInt(text);
+      if (isNaN(num)) return;
+
+      var suffix = text.replace(String(num), '');
+      var duration = 1500;
+      var startTime = null;
+      var started = false;
+
+      var statObserver = new IntersectionObserver(function(entries) {
+        if (entries[0].isIntersecting && !started) {
+          started = true;
+          function animate(time) {
+            if (!startTime) startTime = time;
+            var progress = Math.min((time - startTime) / duration, 1);
+            var eased = 1 - Math.pow(1 - progress, 3);
+            el.textContent = Math.round(num * eased) + suffix;
+            if (progress < 1) requestAnimationFrame(animate);
+          }
+          requestAnimationFrame(animate);
+          statObserver.unobserve(el);
+        }
+      }, { threshold: 0.5 });
+      statObserver.observe(el);
+    });
+  </script>
 </body>
 </html>

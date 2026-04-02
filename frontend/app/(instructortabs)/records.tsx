@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -6,46 +6,39 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  useWindowDimensions,
   View,
 } from "react-native";
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { apiGet } from "../../lib/api";
-import { colors, card, page } from "../../lib/theme";
+import { colors, fonts, radius, space, shadow, card, page, tint } from "../../lib/theme";
+import FadeInView from "../../components/FadeInView";
 
-// ─── Types ──────────────────────────────────────────────────────────────────
-
-type Outcome = "Passed" | "Failed";
-type DriverProfile = "Drowsy" | "Aggressive" | "Normal";
-
-type LearnerRecord = {
-  learnerId: string;
-  initials: string;
-  name: string;
-  lastSessionDate: string;
-  sessionCount: number;
-  roadType: string;
-  score: number;
-  outcome: Outcome;
-  profile: DriverProfile;
-};
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Helpers ────────────────────────────────────────────────────────────────
 
 function initials(name?: string) {
   if (!name?.trim()) return "?";
   const parts = name.trim().split(/\s+/);
-  const a = parts[0]?.[0] ?? "";
-  const b = parts.length > 1 ? parts[parts.length - 1][0] : "";
-  return (a + b).toUpperCase();
+  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase();
 }
 
-function profileFrom(label?: string): DriverProfile {
-  const x = (label || "").toLowerCase();
-  if (x.includes("drowsy")) return "Drowsy";
-  if (x.includes("aggressive")) return "Aggressive";
-  return "Normal";
+function fmtDate(iso?: string) {
+  if (!iso) return "—";
+  const ms = Date.parse(iso);
+  if (!isFinite(ms)) return "—";
+  return new Date(ms).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+
+function scoreColor(s: number) {
+  if (s >= 80) return colors.green;
+  if (s >= 60) return colors.yellow;
+  return colors.red;
+}
+
+function scoreTintKey(s: number) {
+  if (s >= 80) return "green" as const;
+  if (s >= 60) return "yellow" as const;
+  return "red" as const;
 }
 
 function roadTypeFrom(result: any): string {
@@ -56,444 +49,278 @@ function roadTypeFrom(result: any): string {
   return "—";
 }
 
-function formatDate(iso?: string) {
-  if (!iso) return "—";
-  const ms = Date.parse(iso);
-  return isFinite(ms)
-    ? new Date(ms).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })
-    : "—";
-}
+// ─── Types ──────────────────────────────────────────────────────────────────
 
-function scoreColor(s: number) {
-  if (s >= 80) return colors.green;
-  if (s >= 60) return colors.yellow;
-  return colors.red;
-}
+type SessionResult = {
+  session_id: string;
+  date: string;
+  roadType: string;
+  score: number;
+  passed: boolean;
+  behavior: string;
+};
 
-// ─── Sub-components ──────────────────────────────────────────────────────────
-
-function ProfilePill({ profile }: { profile: DriverProfile }) {
-  const cfg = {
-    Normal:     { bg: colors.greenLight,  text: colors.green,      label: "Normal" },
-    Drowsy:     { bg: colors.redLight,    text: colors.red,         label: "Drowsy" },
-    Aggressive: { bg: "#FEF3C7",          text: "#B45309",          label: "Aggressive" },
-  }[profile];
-  return (
-    <View style={[rs.pill, { backgroundColor: cfg.bg }]}>
-      <Text style={[rs.pillText, { color: cfg.text }]}>{cfg.label}</Text>
-    </View>
-  );
-}
-
-function KpiCard({
-  icon,
-  label,
-  value,
-  sub,
-  iconBg,
-  iconColor,
-}: {
-  icon: string;
-  label: string;
-  value: string;
-  sub: string;
-  iconBg: string;
-  iconColor: string;
-}) {
-  return (
-    <View style={[card.base, rs.kpiCard]}>
-      <View style={[rs.kpiIcon, { backgroundColor: iconBg }]}>
-        <Ionicons name={icon as any} size={18} color={iconColor} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={rs.kpiLabel}>{label}</Text>
-        <Text style={rs.kpiValue}>{value}</Text>
-        <Text style={rs.kpiSub}>{sub}</Text>
-      </View>
-    </View>
-  );
-}
+type LearnerGroup = {
+  learnerId: string;
+  name: string;
+  sessionCount: number;
+  avgScore: number;
+  sessions: SessionResult[];
+};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN SCREEN
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export default function RecordsScreen() {
-  const { width } = useWindowDimensions();
-  const isWide = width >= 900;
-  const PAGE_SIZE = isWide ? 8 : 5;
-
+export default function ReportsScreen() {
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [learners, setLearners] = useState<any[]>([]);
   const [resultsRaw, setResultsRaw] = useState<any[]>([]);
 
   const [search, setSearch] = useState("");
-  const [outcomeFilter, setOutcomeFilter] = useState<"All" | Outcome>("All");
-  const [profileFilter, setProfileFilter] = useState<"All" | DriverProfile>("All");
-  const [pageNum, setPageNum] = useState(1);
+  const [sortBy, setSortBy] = useState<"name" | "score">("name");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   async function load() {
-    setError(null);
     setLoading(true);
-    const errors: string[] = [];
-
-    // Fetch independently — one failure shouldn't block the other
     try {
-      const l = await apiGet("/instructor/learners");
+      const [l, r, sess] = await Promise.all([
+        apiGet("/instructor/learners").catch(() => []),
+        apiGet("/records/instructor").catch(() => []),
+        apiGet("/sessions").catch(() => []),
+      ]);
       setLearners(Array.isArray(l) ? l : []);
-    } catch (e: any) {
-      errors.push(`Learners: ${e?.message ?? "failed"}`);
-    }
-
-    try {
-      const r = await apiGet("/records/instructor");
       setResultsRaw(Array.isArray(r) ? r : []);
-    } catch (e: any) {
-      errors.push(`Records: ${e?.message ?? "failed"}`);
-    }
 
-    if (errors.length > 0) setError(errors.join("\n"));
-    setLoading(false);
+      // Enrich learners with names from sessions (covers mismatched bookings)
+      const sessArr = Array.isArray(sess) ? sess : [];
+      const knownIds = new Set((Array.isArray(l) ? l : []).map((x: any) => x?.user_id));
+      for (const s of sessArr) {
+        if (s?.trainee_id && s?.trainee_name && !knownIds.has(s.trainee_id)) {
+          (Array.isArray(l) ? l : []).push({ user_id: s.trainee_id, name: s.trainee_name, role: "trainee" });
+          knownIds.add(s.trainee_id);
+        }
+      }
+      setLearners(Array.isArray(l) ? [...l] : []);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => { load(); }, []);
   useFocusEffect(useCallback(() => { load(); }, []));
 
-  // Map user_id → name
+  // Map user_id → name (from learners + result docs)
   const nameById = useMemo(() => {
     const m: Record<string, string> = {};
     for (const l of learners) {
-      if (l?.user_id) m[l.user_id] = l?.name || l?.email || l.user_id;
+      if (l?.user_id) m[l.user_id] = l?.name || l?.email || "Unknown";
+    }
+    // Also pick up names from result docs (trainee_name or instructor_name fields)
+    for (const r of resultsRaw) {
+      const tid = r?.trainee_id;
+      if (tid && !m[tid]) {
+        m[tid] = r?.trainee_name || r?.instructor_name || "Unknown Student";
+      }
     }
     return m;
-  }, [learners]);
+  }, [learners, resultsRaw]);
 
-  // Aggregate results per learner (one row per learner, latest result on top)
-  const all: LearnerRecord[] = useMemo(() => {
+  // Group results by learner, keep individual sessions
+  const groups: LearnerGroup[] = useMemo(() => {
     const byTrainee = new Map<string, any[]>();
     for (const r of resultsRaw) {
-      const tid = r?.trainee_id || "_unknown";
+      const tid = r?.trainee_id;
+      if (!tid) continue;
       if (!byTrainee.has(tid)) byTrainee.set(tid, []);
       byTrainee.get(tid)!.push(r);
     }
 
     return Array.from(byTrainee.entries()).map(([traineeId, results]) => {
-      // Sort newest first
       results.sort((a, b) => {
         const da = a?.created_at ? Date.parse(a.created_at) : 0;
         const db = b?.created_at ? Date.parse(b.created_at) : 0;
         return db - da;
       });
-      const latest = results[0];
+
       const scores = results
-        .map((r) => (typeof r?.analysis?.overall === "number" ? r.analysis.overall : 0))
+        .map((r) => r?.performance_score ?? r?.analysis?.overall ?? 0)
         .filter((s) => s > 0);
       const avgScore = scores.length
         ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
         : 0;
 
-      const name = nameById[traineeId] || traineeId;
+      const sessions: SessionResult[] = results.map((r) => ({
+        session_id: r?.session_id || "",
+        date: fmtDate(r?.created_at),
+        roadType: roadTypeFrom(r),
+        score: r?.performance_score ?? r?.analysis?.overall ?? 0,
+        passed: (r?.performance_score ?? r?.analysis?.overall ?? 0) >= 60,
+        behavior: r?.analysis?.behavior || "—",
+      }));
+
       return {
         learnerId: traineeId,
-        initials: initials(name),
-        name,
-        lastSessionDate: formatDate(latest?.created_at),
+        name: nameById[traineeId] || "Unknown",
         sessionCount: results.length,
-        roadType: roadTypeFrom(latest),
-        score: avgScore,
-        outcome: (avgScore >= 60 ? "Passed" : "Failed") as Outcome,
-        profile: profileFrom(latest?.analysis?.behavior),
+        avgScore,
+        sessions,
       };
     });
   }, [resultsRaw, nameById]);
 
-  // KPI aggregates
-  const drowsyCount     = useMemo(() => all.filter((r) => r.profile === "Drowsy").length,     [all]);
-  const aggressiveCount = useMemo(() => all.filter((r) => r.profile === "Aggressive").length, [all]);
-  const normalCount     = useMemo(() => all.filter((r) => r.profile === "Normal").length,     [all]);
-  const total = all.length;
-
-  const drowsyPct     = Math.round((drowsyCount     / Math.max(1, total)) * 100);
-  const aggressivePct = Math.round((aggressiveCount / Math.max(1, total)) * 100);
-  const normalPct     = Math.round((normalCount     / Math.max(1, total)) * 100);
-
-  // Filtered + paginated
+  // Filter + sort
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return all.filter((r) => {
-      const matchQ = !q || r.name.toLowerCase().includes(q) || r.learnerId.toLowerCase().includes(q);
-      const matchO = outcomeFilter === "All" || r.outcome === outcomeFilter;
-      const matchP = profileFilter === "All" || r.profile === profileFilter;
-      return matchQ && matchO && matchP;
-    });
-  }, [all, search, outcomeFilter, profileFilter]);
+    let list = groups.filter((g) => !q || g.name.toLowerCase().includes(q));
 
-  useEffect(() => { setPageNum(1); }, [search, outcomeFilter, profileFilter, isWide]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const safePage   = Math.min(pageNum, totalPages);
-  const startIdx   = (safePage - 1) * PAGE_SIZE;
-  const pageItems  = filtered.slice(startIdx, startIdx + PAGE_SIZE);
-  const endIdx     = startIdx + pageItems.length;
-
-  function cycleOutcome() {
-    setOutcomeFilter((v) => v === "All" ? "Passed" : v === "Passed" ? "Failed" : "All");
-  }
-  function cycleProfile() {
-    setProfileFilter((v) => v === "All" ? "Normal" : v === "Normal" ? "Drowsy" : v === "Drowsy" ? "Aggressive" : "All");
-  }
-
-  // ── Loading / Error ────────────────────────────────────────────────────────
+    if (sortBy === "name") {
+      list.sort((a, b) => sortDir === "asc" ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name));
+    } else {
+      list.sort((a, b) => sortDir === "asc" ? a.avgScore - b.avgScore : b.avgScore - a.avgScore);
+    }
+    return list;
+  }, [groups, search, sortBy, sortDir]);
 
   if (loading) {
     return (
       <View style={page.center}>
         <ActivityIndicator size="large" color={colors.purpleDark} />
-        <Text style={page.centerText}>Loading records…</Text>
+        <Text style={page.centerText}>Loading reports...</Text>
       </View>
     );
   }
-
-  if (error) {
-    return (
-      <View style={page.center}>
-        <Ionicons name="alert-circle-outline" size={44} color={colors.red} />
-        <Text style={[page.centerText, { color: colors.red, marginTop: 8 }]}>{error}</Text>
-        <Pressable onPress={load} style={rs.retryBtn}>
-          <Text style={rs.retryBtnText}>Retry</Text>
-        </Pressable>
-      </View>
-    );
-  }
-
-  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <ScrollView
-      style={page.base}
-      contentContainerStyle={[page.content, { paddingTop: 16 }]}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Header */}
-      <View>
-        <Text style={rs.h1}>Learner Records</Text>
-        <Text style={rs.h2}>
-          {total} learner{total !== 1 ? "s" : ""} · performance and session history
-        </Text>
-      </View>
+    <ScrollView style={s.page} contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
+      <Text style={s.h1}>Student Reports</Text>
+      <Text style={s.h2}>{groups.length} student{groups.length !== 1 ? "s" : ""} with session history</Text>
 
-      {/* KPI strip */}
-      <View style={[rs.kpiStrip, isWide && { flexDirection: "row" }]}>
-        <KpiCard
-          icon="checkmark-circle-outline"
-          label="Normal profile"
-          value={`${normalPct}%`}
-          sub={`${normalCount} learner${normalCount !== 1 ? "s" : ""}`}
-          iconBg={colors.greenLight}
-          iconColor={colors.green}
-        />
-        <KpiCard
-          icon="moon-outline"
-          label="Drowsy profile"
-          value={`${drowsyPct}%`}
-          sub={`${drowsyCount} learner${drowsyCount !== 1 ? "s" : ""}`}
-          iconBg={colors.redLight}
-          iconColor={colors.red}
-        />
-        <KpiCard
-          icon="warning-outline"
-          label="Aggressive profile"
-          value={`${aggressivePct}%`}
-          sub={`${aggressiveCount} learner${aggressiveCount !== 1 ? "s" : ""}`}
-          iconBg="#FEF3C7"
-          iconColor="#B45309"
-        />
-      </View>
-
-      {/* Filters */}
-      <View style={[card.base, rs.filterCard]}>
-        <View style={[rs.filterRow, isWide && { flexDirection: "row" }]}>
-          {/* Search */}
-          <View style={rs.searchWrap}>
+      {/* Search + Sort */}
+      <FadeInView delay={0}>
+        <View style={s.filterRow}>
+          <View style={s.searchWrap}>
             <Ionicons name="search-outline" size={16} color={colors.muted} style={{ marginRight: 8 }} />
             <TextInput
               value={search}
               onChangeText={setSearch}
-              placeholder="Search by name or ID…"
+              placeholder="Search by student name..."
               placeholderTextColor={colors.muted}
-              style={rs.searchInput}
+              style={s.searchInput}
             />
           </View>
-
-          {/* Outcome toggle */}
-          <Pressable onPress={cycleOutcome} style={rs.filterBtn}>
-            <Text style={rs.filterBtnText}>
-              {outcomeFilter === "All" ? "All Outcomes" : outcomeFilter}
-            </Text>
-            <Ionicons name="chevron-down" size={14} color={colors.subtext} />
+          <Pressable
+            onPress={() => {
+              if (sortBy === "name") { setSortDir((d) => d === "asc" ? "desc" : "asc"); }
+              else { setSortBy("name"); setSortDir("asc"); }
+            }}
+            style={[s.sortBtn, sortBy === "name" && s.sortBtnActive]}
+          >
+            <Ionicons name={sortDir === "asc" && sortBy === "name" ? "arrow-up" : "arrow-down"} size={14} color={sortBy === "name" ? colors.purpleDark : colors.subtext} />
+            <Text style={[s.sortBtnText, sortBy === "name" && { color: colors.purpleDark }]}>A-Z</Text>
           </Pressable>
-
-          {/* Profile toggle */}
-          <Pressable onPress={cycleProfile} style={rs.filterBtn}>
-            <Text style={rs.filterBtnText}>
-              {profileFilter === "All" ? "All Profiles" : profileFilter}
-            </Text>
-            <Ionicons name="chevron-down" size={14} color={colors.subtext} />
+          <Pressable
+            onPress={() => {
+              if (sortBy === "score") { setSortDir((d) => d === "asc" ? "desc" : "asc"); }
+              else { setSortBy("score"); setSortDir("desc"); }
+            }}
+            style={[s.sortBtn, sortBy === "score" && s.sortBtnActive]}
+          >
+            <Ionicons name={sortDir === "desc" && sortBy === "score" ? "arrow-down" : "arrow-up"} size={14} color={sortBy === "score" ? colors.purpleDark : colors.subtext} />
+            <Text style={[s.sortBtnText, sortBy === "score" && { color: colors.purpleDark }]}>Score</Text>
           </Pressable>
         </View>
-      </View>
+      </FadeInView>
 
-      {/* Table — wide */}
-      {isWide ? (
-        <View style={[card.base, rs.tableCard]}>
-          {/* Header */}
-          <View style={rs.tableHeader}>
-            <Text style={[rs.th, { flex: 2.4 }]}>Learner</Text>
-            <Text style={[rs.th, { flex: 1 }]}>Sessions</Text>
-            <Text style={[rs.th, { flex: 1.4 }]}>Last Session</Text>
-            <Text style={[rs.th, { flex: 1 }]}>Road Type</Text>
-            <Text style={[rs.th, { flex: 1.6 }]}>Avg Score</Text>
-            <Text style={[rs.th, { flex: 1 }]}>Outcome</Text>
-            <Text style={[rs.th, { flex: 1, textAlign: "right" }]}>Profile</Text>
-          </View>
-
-          {pageItems.length === 0 ? (
-            <View style={rs.emptyTable}>
-              <Text style={rs.emptyText}>No records match your filters</Text>
-            </View>
-          ) : (
-            pageItems.map((r, i) => (
-              <View
-                key={r.learnerId}
-                style={[rs.tr, i < pageItems.length - 1 && rs.trBorder]}
-              >
-                {/* Learner */}
-                <View style={[rs.tdCell, { flex: 2.4, flexDirection: "row", alignItems: "center", gap: 10 }]}>
-                  <View style={rs.avatar}>
-                    <Text style={rs.avatarText}>{r.initials}</Text>
-                  </View>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={rs.tdName} numberOfLines={1}>{r.name}</Text>
-                    <Text style={rs.tdSub} numberOfLines={1}>{r.learnerId}</Text>
-                  </View>
-                </View>
-
-                <Text style={[rs.tdText, { flex: 1 }]}>{r.sessionCount}</Text>
-                <Text style={[rs.tdText, { flex: 1.4 }]}>{r.lastSessionDate}</Text>
-                <Text style={[rs.tdText, { flex: 1 }]}>{r.roadType}</Text>
-
-                {/* Score bar */}
-                <View style={[rs.tdCell, { flex: 1.6 }]}>
-                  <View style={rs.scoreRow}>
-                    <View style={rs.scoreTrack}>
-                      <View
-                        style={[
-                          rs.scoreFill,
-                          {
-                            width: `${Math.max(0, Math.min(100, r.score))}%` as any,
-                            backgroundColor: scoreColor(r.score),
-                          },
-                        ]}
-                      />
-                    </View>
-                    <Text style={[rs.scoreNum, { color: scoreColor(r.score) }]}>{r.score}</Text>
-                  </View>
-                </View>
-
-                {/* Outcome */}
-                <View style={[rs.tdCell, { flex: 1 }]}>
-                  <View
-                    style={[
-                      rs.outcomePill,
-                      { backgroundColor: r.outcome === "Passed" ? colors.darkBtn : colors.red },
-                    ]}
-                  >
-                    <Text style={rs.outcomeText}>{r.outcome}</Text>
-                  </View>
-                </View>
-
-                {/* Profile */}
-                <View style={[rs.tdCell, { flex: 1, alignItems: "flex-end" }]}>
-                  <ProfilePill profile={r.profile} />
-                </View>
-              </View>
-            ))
-          )}
-
-          {/* Footer + pagination */}
-          <View style={rs.tableFooter}>
-            <Text style={rs.footerText}>
-              {filtered.length === 0
-                ? "No results"
-                : `${startIdx + 1}–${endIdx} of ${filtered.length}`}
-            </Text>
-            <Pagination page={safePage} total={totalPages} onPage={setPageNum} />
-          </View>
+      {/* Learner List */}
+      {filtered.length === 0 ? (
+        <View style={s.emptyCard}>
+          <Text style={s.emptyText}>
+            {search ? "No students match your search." : "No student reports yet."}
+          </Text>
         </View>
       ) : (
-        /* Mobile cards */
-        <View style={{ gap: 12 }}>
-          {pageItems.length === 0 ? (
-            <View style={[card.base, rs.emptyCard]}>
-              <Text style={rs.emptyText}>No records match your filters</Text>
-            </View>
-          ) : (
-            pageItems.map((r) => (
-              <View key={r.learnerId} style={[card.base, rs.mobileCard]}>
-                <View style={rs.mobileTop}>
-                  <View style={rs.avatar}>
-                    <Text style={rs.avatarText}>{r.initials}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={rs.mobileName} numberOfLines={1}>{r.name}</Text>
-                    <Text style={rs.mobileSub}>{r.learnerId}</Text>
-                  </View>
-                  <ProfilePill profile={r.profile} />
-                </View>
-
-                <View style={rs.mobileMeta}>
-                  <MiniTag label="Sessions" value={String(r.sessionCount)} />
-                  <MiniTag label="Last Session" value={r.lastSessionDate} />
-                  <MiniTag label="Road Type" value={r.roadType} />
-                </View>
-
-                <View style={rs.mobileScoreRow}>
-                  <View style={rs.scoreTrack}>
-                    <View
-                      style={[
-                        rs.scoreFill,
-                        {
-                          width: `${Math.max(0, Math.min(100, r.score))}%` as any,
-                          backgroundColor: scoreColor(r.score),
-                        },
-                      ]}
+        <View style={{ gap: 10 }}>
+          {filtered.map((group, idx) => {
+            const isExpanded = expandedIds.has(group.learnerId);
+            return (
+              <FadeInView key={group.learnerId} delay={idx * 40}>
+                <Pressable
+                  onPress={() => setExpandedIds((prev) => {
+                    const next = new Set(prev);
+                    if (isExpanded) next.delete(group.learnerId);
+                    else next.add(group.learnerId);
+                    return next;
+                  })}
+                  style={({ pressed }) => [s.learnerCard, pressed && { opacity: 0.95 }]}
+                >
+                  {/* Collapsed header */}
+                  <View style={s.learnerHeader}>
+                    <View style={s.avatar}>
+                      <Text style={s.avatarText}>{initials(group.name)}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.learnerName}>{group.name}</Text>
+                      <Text style={s.learnerMeta}>
+                        {group.sessionCount} session{group.sessionCount !== 1 ? "s" : ""}
+                      </Text>
+                    </View>
+                    <View style={[s.scoreBadge, { backgroundColor: tint[scoreTintKey(group.avgScore)].bg }]}>
+                      <Text style={[s.scoreText, { color: scoreColor(group.avgScore) }]}>
+                        {group.avgScore}
+                      </Text>
+                      <Text style={[s.scoreUnit, { color: scoreColor(group.avgScore) }]}>/100</Text>
+                    </View>
+                    <Ionicons
+                      name={isExpanded ? "chevron-up" : "chevron-down"}
+                      size={18}
+                      color={colors.muted}
+                      style={{ marginLeft: 4 }}
                     />
                   </View>
-                  <Text style={[rs.scoreNum, { color: scoreColor(r.score), marginLeft: 8 }]}>
-                    {r.score}/100
-                  </Text>
-                  <View
-                    style={[
-                      rs.outcomePill,
-                      { backgroundColor: r.outcome === "Passed" ? colors.darkBtn : colors.red, marginLeft: 8 },
-                    ]}
-                  >
-                    <Text style={rs.outcomeText}>{r.outcome}</Text>
-                  </View>
-                </View>
-              </View>
-            ))
-          )}
 
-          <View style={[card.base, rs.mobileFooter]}>
-            <Text style={rs.footerText}>
-              {filtered.length === 0
-                ? "No results"
-                : `${startIdx + 1}–${endIdx} of ${filtered.length}`}
-            </Text>
-            <Pagination page={safePage} total={totalPages} onPage={setPageNum} />
-          </View>
+                  {/* Expanded session list */}
+                  {isExpanded && (
+                    <View style={s.sessionList}>
+                      {group.sessions.map((sess) => (
+                        <View key={sess.session_id} style={s.sessionRow}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={s.sessionDate}>{sess.date}</Text>
+                            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 3 }}>
+                              <View style={s.roadPill}>
+                                <Text style={s.roadPillText}>{sess.roadType}</Text>
+                              </View>
+                              <View style={[s.statusPill, { backgroundColor: sess.passed ? colors.green : colors.yellow }]}>
+                                <Text style={s.statusPillText}>{sess.passed ? "Good" : "Needs Work"}</Text>
+                              </View>
+                            </View>
+                          </View>
+                          <View style={[s.sessionScore, { backgroundColor: tint[scoreTintKey(sess.score)].bg }]}>
+                            <Text style={[s.sessionScoreText, { color: scoreColor(sess.score) }]}>
+                              {sess.score}
+                            </Text>
+                          </View>
+                          <Pressable
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              router.push({
+                                pathname: "/(instructortabs)/session-report" as any,
+                                params: { sessionId: sess.session_id },
+                              });
+                            }}
+                            style={({ pressed }) => [s.viewBtn, pressed && { opacity: 0.8 }]}
+                          >
+                            <Text style={s.viewBtnText}>View</Text>
+                          </Pressable>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </Pressable>
+              </FadeInView>
+            );
+          })}
         </View>
       )}
 
@@ -502,253 +329,82 @@ export default function RecordsScreen() {
   );
 }
 
-// ─── Pagination ───────────────────────────────────────────────────────────────
+// ─── Styles ─────────────────────────────────────────────────────────────────
 
-function Pagination({
-  page,
-  total,
-  onPage,
-}: {
-  page: number;
-  total: number;
-  onPage: (n: number) => void;
-}) {
-  const half = 2;
-  let start = Math.max(1, page - half);
-  let end   = Math.min(total, start + 4);
-  start      = Math.max(1, end - 4);
-  const nums: number[] = [];
-  for (let i = start; i <= end; i++) nums.push(i);
+const s = StyleSheet.create({
+  page: { flex: 1, backgroundColor: colors.pageBg },
+  content: { padding: space.page, paddingBottom: 32, gap: 14 },
 
-  return (
-    <View style={rs.pagination}>
-      <Pressable
-        onPress={() => onPage(Math.max(1, page - 1))}
-        disabled={page === 1}
-        style={[rs.pageBtn, page === 1 && { opacity: 0.4 }]}
-      >
-        <Ionicons name="chevron-back" size={14} color={colors.text} />
-        <Text style={rs.pageBtnText}>Prev</Text>
-      </Pressable>
+  h1: { fontSize: 22, fontFamily: fonts.extrabold, color: colors.textAlt, letterSpacing: -0.5 },
+  h2: { fontSize: 12, fontFamily: fonts.bold, color: colors.subtext, marginTop: 2 },
 
-      {nums.map((n) => (
-        <Pressable
-          key={n}
-          onPress={() => onPage(n)}
-          style={[rs.pageNum, n === page && rs.pageNumOn]}
-        >
-          <Text style={[rs.pageNumText, n === page && rs.pageNumTextOn]}>{n}</Text>
-        </Pressable>
-      ))}
-
-      <Pressable
-        onPress={() => onPage(Math.min(total, page + 1))}
-        disabled={page === total}
-        style={[rs.pageBtn, page === total && { opacity: 0.4 }]}
-      >
-        <Text style={rs.pageBtnText}>Next</Text>
-        <Ionicons name="chevron-forward" size={14} color={colors.text} />
-      </Pressable>
-    </View>
-  );
-}
-
-// ─── MiniTag ─────────────────────────────────────────────────────────────────
-
-function MiniTag({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={rs.miniTag}>
-      <Text style={rs.miniLabel}>{label}</Text>
-      <Text style={rs.miniValue} numberOfLines={1}>{value}</Text>
-    </View>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// STYLES
-// ═══════════════════════════════════════════════════════════════════════════════
-
-const rs = StyleSheet.create({
-  // ── Header
-  h1: { fontSize: 24, fontWeight: "900", color: colors.text, letterSpacing: -0.5 },
-  h2: { fontSize: 13, fontWeight: "600", color: colors.subtext, marginTop: 4 },
-
-  // ── KPI
-  kpiStrip: { flexDirection: "column", gap: 10 },
-  kpiCard: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    minWidth: 0,
-  },
-  kpiIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-  kpiLabel: { fontSize: 11, fontWeight: "700", color: colors.subtext },
-  kpiValue: { fontSize: 22, fontWeight: "900", color: colors.text, marginTop: 2 },
-  kpiSub:   { fontSize: 11, fontWeight: "600", color: colors.muted, marginTop: 1 },
-
-  // ── Filters
-  filterCard: { padding: 14 },
-  filterRow:  { gap: 10, flexDirection: "column" },
+  // Filter
+  filterRow: { flexDirection: "row", gap: 10 },
   searchWrap: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: colors.inputBg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    flex: 1, flexDirection: "row", alignItems: "center",
+    backgroundColor: colors.cardBg, borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.input, paddingHorizontal: 12, minHeight: 46,
   },
-  searchInput: { flex: 1, color: colors.text, fontWeight: "700", fontSize: 13 },
-  filterBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.inputBg,
-    alignSelf: "flex-start",
+  searchInput: { flex: 1, color: colors.textAlt, fontSize: 13, fontFamily: fonts.bold },
+  sortBtn: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    paddingHorizontal: 14, minHeight: 46,
+    backgroundColor: colors.cardBg, borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.input,
   },
-  filterBtnText: { fontSize: 13, fontWeight: "800", color: colors.text },
+  sortBtnActive: { borderColor: colors.purpleBorder, backgroundColor: tint.purple.bg },
+  sortBtnText: { fontSize: 12, fontFamily: fonts.bold, color: colors.subtext, userSelect: "none" },
 
-  // ── Table
-  tableCard: { padding: 0, overflow: "hidden" },
-  tableHeader: {
-    flexDirection: "row",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    backgroundColor: colors.inputBg,
+  // Learner card
+  learnerCard: {
+    backgroundColor: colors.cardBg, borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.cardLg, padding: space.lg, ...shadow.sm,
   },
-  th: { fontSize: 11, fontWeight: "900", color: colors.subtext, textTransform: "uppercase" },
-  tr: { flexDirection: "row", paddingHorizontal: 14, paddingVertical: 13, alignItems: "center" },
-  trBorder: { borderBottomWidth: 1, borderBottomColor: colors.borderLight },
-  tdCell: {},
-  tdText: { fontSize: 13, fontWeight: "700", color: colors.text },
-  tdName: { fontSize: 13, fontWeight: "900", color: colors.text },
-  tdSub:  { fontSize: 11, fontWeight: "600", color: colors.subtext, marginTop: 1 },
-
-  emptyTable: { paddingVertical: 32, alignItems: "center" },
-  emptyCard:  { paddingVertical: 32, alignItems: "center" },
-  emptyText:  { fontSize: 13, fontWeight: "700", color: colors.muted },
-
-  tableFooter: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  footerText: { fontSize: 12, fontWeight: "700", color: colors.subtext },
-
-  // ── Avatar
+  learnerHeader: { flexDirection: "row", alignItems: "center", gap: 12 },
   avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#EEF2FF",
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
+    width: 42, height: 42, borderRadius: 21,
+    backgroundColor: tint.purple.bg, alignItems: "center", justifyContent: "center",
   },
-  avatarText: { fontSize: 13, fontWeight: "900", color: "#4F46E5" },
-
-  // ── Score
-  scoreRow:  { flexDirection: "row", alignItems: "center", gap: 8 },
-  scoreTrack: { flex: 1, height: 6, borderRadius: 99, backgroundColor: colors.borderLight, overflow: "hidden" },
-  scoreFill:  { height: "100%", borderRadius: 99 },
-  scoreNum:   { fontSize: 13, fontWeight: "900", minWidth: 28 },
-
-  // ── Outcome pill
-  outcomePill: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-    alignSelf: "flex-start",
+  avatarText: { fontSize: 14, fontFamily: fonts.extrabold, color: colors.purpleDark },
+  learnerName: { fontSize: 14, fontFamily: fonts.bold, color: colors.textAlt },
+  learnerMeta: { fontSize: 12, fontFamily: fonts.medium, color: colors.subtext, marginTop: 2 },
+  scoreBadge: {
+    flexDirection: "row", alignItems: "baseline",
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8,
   },
-  outcomeText: { fontSize: 11, fontWeight: "900", color: "#FFFFFF" },
+  scoreText: { fontSize: 16, fontFamily: fonts.extrabold },
+  scoreUnit: { fontSize: 10, fontFamily: fonts.bold, marginLeft: 1 },
 
-  // ── Profile pill
-  pill: { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, alignSelf: "flex-start" },
-  pillText: { fontSize: 11, fontWeight: "800" },
-
-  // ── Mobile cards
-  mobileCard: { gap: 12, paddingVertical: 14, paddingHorizontal: 14 },
-  mobileTop:  { flexDirection: "row", alignItems: "center", gap: 10 },
-  mobileName: { fontSize: 14, fontWeight: "900", color: colors.text },
-  mobileSub:  { fontSize: 11, fontWeight: "600", color: colors.subtext, marginTop: 1 },
-  mobileMeta: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
-  mobileScoreRow: { flexDirection: "row", alignItems: "center" },
-  mobileFooter: { padding: 12 },
-
-  // ── MiniTag
-  miniTag: {
-    flexGrow: 1,
-    minWidth: 90,
-    backgroundColor: colors.inputBg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+  // Session list (expanded)
+  sessionList: {
+    marginTop: 12, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12, gap: 8,
   },
-  miniLabel: { fontSize: 10, fontWeight: "800", color: colors.muted },
-  miniValue: { fontSize: 12, fontWeight: "900", color: colors.text, marginTop: 2 },
+  sessionRow: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    backgroundColor: colors.pageBg, borderRadius: radius.input, padding: space.md,
+  },
+  sessionDate: { fontSize: 13, fontFamily: fonts.bold, color: colors.textAlt },
+  roadPill: {
+    backgroundColor: tint.blue.bg, borderRadius: radius.pill,
+    paddingHorizontal: 8, paddingVertical: 2,
+  },
+  roadPillText: { fontSize: 10, fontFamily: fonts.bold, color: colors.blue },
+  statusPill: { borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 2 },
+  statusPillText: { fontSize: 10, fontFamily: fonts.extrabold, color: "#fff" },
+  sessionScore: {
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8,
+  },
+  sessionScoreText: { fontSize: 14, fontFamily: fonts.extrabold },
+  viewBtn: {
+    paddingHorizontal: 12, paddingVertical: 8,
+    backgroundColor: colors.darkBtn, borderRadius: radius.input,
+  },
+  viewBtnText: { fontSize: 12, fontFamily: fonts.bold, color: "#fff" },
 
-  // ── Pagination
-  pagination: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
-  pageBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.cardBg,
+  // Empty
+  emptyCard: {
+    backgroundColor: colors.cardBg, borderWidth: 1, borderColor: colors.border,
+    borderRadius: radius.cardLg, padding: 32, alignItems: "center",
   },
-  pageBtnText: { fontSize: 12, fontWeight: "800", color: colors.text },
-  pageNum: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.cardBg,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  pageNumOn: { backgroundColor: colors.darkBtn, borderColor: colors.darkBtn },
-  pageNumText:   { fontSize: 13, fontWeight: "800", color: colors.text },
-  pageNumTextOn: { fontSize: 13, fontWeight: "900", color: "#FFFFFF" },
-
-  // ── Retry
-  retryBtn: {
-    marginTop: 16,
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: colors.purpleDark,
-  },
-  retryBtnText: { fontSize: 14, fontWeight: "700", color: "#FFFFFF" },
+  emptyText: { fontSize: 13, fontFamily: fonts.bold, color: colors.muted, textAlign: "center" },
 });
