@@ -120,7 +120,7 @@ export default function SessionCard({
                 color={passed ? colors.green : colors.red}
               />
               <Text style={[s.statusText, { color: passed ? colors.greenDark : colors.redDark }]}>
-                {passed ? "Passed" : "Needs Improvement"}
+                {passed ? "Good" : "Needs Work"}
               </Text>
             </View>
           )}

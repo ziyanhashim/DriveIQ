@@ -23,6 +23,7 @@ sessions_col            = db["sessions"]
 results_col             = db["results"]
 reviews_col             = db["reviews"]
 settings_col            = db["settings"]
+demo_scenarios_col      = db["demo_scenarios"]
 
 
 def _safe_create_index(col, keys, **kwargs):

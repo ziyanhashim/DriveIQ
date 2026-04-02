@@ -17,8 +17,8 @@ import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { clearToken } from "../../lib/token";
 import { router } from "expo-router";
-import { apiGet, apiPatch, apiPost } from "../../lib/api";
-import { colors, card, page } from "../../lib/theme";
+import { apiGet, apiPatch, apiPost, apiDelete } from "../../lib/api";
+import { colors, fonts, radius, space, card, page } from "../../lib/theme";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -554,6 +554,23 @@ export default function SettingsScreen() {
           )}
         </View>
 
+        {/* ── Clear Session History ─────────────────────────────────────────── */}
+        <Pressable
+          onPress={() => {
+            const ok = window?.confirm?.("This will remove recent session data. Are you sure?") ?? true;
+            if (!ok) return;
+            apiDelete("/sessions/clear-demo").then(() => {
+              Alert.alert("Done", "Session history cleared.");
+            }).catch(() => {
+              Alert.alert("Error", "Failed to clear session history.");
+            });
+          }}
+          style={({ pressed }) => [ss.logoutBtn, { backgroundColor: "#DC2626" }, pressed && { opacity: 0.85 }]}
+        >
+          <Ionicons name="trash-outline" size={18} color="#FFFFFF" />
+          <Text style={ss.logoutText}>Clear Session History</Text>
+        </Pressable>
+
         {/* ── Logout ───────────────────────────────────────────────────────── */}
         <Pressable
           onPress={handleLogout}
@@ -684,8 +701,8 @@ export default function SettingsScreen() {
 
 const ss = StyleSheet.create({
   // ── Header
-  h1: { fontSize: 24, fontWeight: "900", color: colors.text, letterSpacing: -0.5 },
-  h2: { fontSize: 13, fontWeight: "600", color: colors.subtext, marginTop: 4 },
+  h1: { fontSize: 22, fontFamily: fonts.extrabold, color: colors.text, letterSpacing: -0.5 },
+  h2: { fontSize: 12, fontFamily: fonts.bold, color: colors.subtext, marginTop: 4 },
 
   // ── Accordion
   section: { padding: 0, overflow: "hidden" },
@@ -693,14 +710,14 @@ const ss = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: 16,
+    padding: space.lg,
   },
   accordionLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
-  accordionTitle: { fontSize: 14, fontWeight: "900", color: colors.text },
+  accordionTitle: { fontSize: 14, fontFamily: fonts.extrabold, color: colors.text },
   sectionBody: {
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    padding: 16,
+    padding: space.lg,
     gap: 4,
   },
 
@@ -719,9 +736,9 @@ const ss = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  avatarText: { fontSize: 20, fontWeight: "900", color: colors.purpleDark },
-  avatarName:  { fontSize: 15, fontWeight: "900", color: colors.text },
-  avatarEmail: { fontSize: 12, fontWeight: "600", color: colors.subtext, marginTop: 2 },
+  avatarText: { fontSize: 20, fontFamily: fonts.extrabold, color: colors.purpleDark },
+  avatarName:  { fontSize: 15, fontFamily: fonts.extrabold, color: colors.text },
+  avatarEmail: { fontSize: 12, fontFamily: fonts.medium, color: colors.subtext, marginTop: 2 },
 
   // ── Form
   formGrid: { gap: 12 },
@@ -732,25 +749,25 @@ const ss = StyleSheet.create({
   },
   field: { gap: 6 },
   fieldHalf: { width: "48%" },
-  fieldLabel: { fontSize: 12, fontWeight: "800", color: colors.text },
+  fieldLabel: { fontSize: 12, fontFamily: fonts.bold, color: colors.text },
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: colors.inputBg,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 12,
+    borderRadius: radius.input,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
   input: {
     flex: 1,
     fontSize: 13,
-    fontWeight: "600",
+    fontFamily: fonts.medium,
     color: colors.text,
     padding: 0,
   },
-  helper: { fontSize: 11, fontWeight: "600", color: colors.muted },
+  helper: { fontSize: 11, fontFamily: fonts.medium, color: colors.muted },
 
   // ── Password row
   passwordRow: {
@@ -767,9 +784,9 @@ const ss = StyleSheet.create({
     backgroundColor: colors.cardBg,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    borderRadius: 10,
+    borderRadius: radius.input,
   },
-  changePwdText: { fontSize: 12, fontWeight: "900", color: colors.text },
+  changePwdText: { fontSize: 12, fontFamily: fonts.extrabold, color: colors.text },
 
   // ── Select
   select: {
@@ -779,11 +796,11 @@ const ss = StyleSheet.create({
     backgroundColor: colors.inputBg,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 12,
+    borderRadius: radius.input,
     paddingHorizontal: 12,
     paddingVertical: 12,
   },
-  selectText: { fontSize: 13, fontWeight: "600", color: colors.text, flex: 1 },
+  selectText: { fontSize: 13, fontFamily: fonts.medium, color: colors.text, flex: 1 },
 
   // ── Save
   saveRow: { marginTop: 16, alignItems: "flex-end" },
@@ -791,12 +808,12 @@ const ss = StyleSheet.create({
     backgroundColor: colors.darkBtn,
     paddingHorizontal: 20,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: radius.input,
     minWidth: 130,
     alignItems: "center",
     justifyContent: "center",
   },
-  saveBtnText: { fontSize: 13, fontWeight: "900", color: "#FFFFFF" },
+  saveBtnText: { fontSize: 13, fontFamily: fonts.extrabold, color: "#FFFFFF" },
 
   // ── Toggle
   toggleRow: {
@@ -805,8 +822,8 @@ const ss = StyleSheet.create({
     paddingVertical: 10,
     gap: 12,
   },
-  toggleLabel: { fontSize: 13, fontWeight: "800", color: colors.text },
-  toggleSub:   { fontSize: 11, fontWeight: "600", color: colors.subtext, marginTop: 2 },
+  toggleLabel: { fontSize: 13, fontFamily: fonts.bold, color: colors.text },
+  toggleSub:   { fontSize: 11, fontFamily: fonts.medium, color: colors.subtext, marginTop: 2 },
   rowDivider:  { height: 1, backgroundColor: colors.borderLight },
 
   // ── Info box
@@ -815,14 +832,14 @@ const ss = StyleSheet.create({
     alignItems: "flex-start",
     gap: 10,
     backgroundColor: colors.inputBg,
-    borderRadius: 12,
+    borderRadius: radius.input,
     padding: 12,
     marginBottom: 12,
   },
   infoText: {
     flex: 1,
     fontSize: 13,
-    fontWeight: "600",
+    fontFamily: fonts.medium,
     color: colors.subtext,
     lineHeight: 19,
   },
@@ -834,7 +851,7 @@ const ss = StyleSheet.create({
     gap: 8,
     paddingVertical: 12,
     paddingHorizontal: 14,
-    borderRadius: 12,
+    borderRadius: radius.input,
     borderWidth: 1,
     borderColor: colors.purpleDark,
     backgroundColor: colors.purpleLight,
@@ -842,7 +859,7 @@ const ss = StyleSheet.create({
   linkBtnText: {
     flex: 1,
     fontSize: 13,
-    fontWeight: "800",
+    fontFamily: fonts.bold,
     color: colors.purpleDark,
   },
 
@@ -855,8 +872,8 @@ const ss = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.borderLight,
   },
-  metaLabel: { fontSize: 12, fontWeight: "700", color: colors.subtext },
-  metaValue: { fontSize: 13, fontWeight: "800", color: colors.text },
+  metaLabel: { fontSize: 12, fontFamily: fonts.bold, color: colors.subtext },
+  metaValue: { fontSize: 13, fontFamily: fonts.bold, color: colors.text },
 
   // ── Logout
   logoutBtn: {
@@ -865,15 +882,15 @@ const ss = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
     backgroundColor: colors.red,
-    borderRadius: 14,
+    borderRadius: radius.card,
     paddingVertical: 14,
   },
-  logoutText: { fontSize: 14, fontWeight: "900", color: "#FFFFFF" },
+  logoutText: { fontSize: 14, fontFamily: fonts.extrabold, color: "#FFFFFF" },
 
   footer: {
     marginTop: 8,
     fontSize: 11,
-    fontWeight: "600",
+    fontFamily: fonts.medium,
     color: colors.muted,
     textAlign: "center",
   },
@@ -890,7 +907,7 @@ const ss = StyleSheet.create({
     width: "100%",
     maxWidth: 420,
     backgroundColor: colors.cardBg,
-    borderRadius: 16,
+    borderRadius: radius.cardLg,
     padding: 20,
     ...Platform.select({
       ios: { shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 20, shadowOffset: { width: 0, height: 8 } },
@@ -906,44 +923,44 @@ const ss = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  modalTitle: { fontSize: 15, fontWeight: "900", color: colors.text },
-  modalSub: { fontSize: 12, fontWeight: "700", color: colors.subtext, marginTop: 2 },
+  modalTitle: { fontSize: 15, fontFamily: fonts.extrabold, color: colors.text },
+  modalSub: { fontSize: 12, fontFamily: fonts.bold, color: colors.subtext, marginTop: 2 },
 
   modalDivider: { height: 1, backgroundColor: colors.border, marginVertical: 14 },
 
-  modalLabel: { fontSize: 12, fontWeight: "900", color: colors.text, marginBottom: 8 },
+  modalLabel: { fontSize: 12, fontFamily: fonts.extrabold, color: colors.text, marginBottom: 8 },
   modalInputRow: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: colors.inputBg,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 10,
+    borderRadius: radius.input,
     paddingHorizontal: 12,
     paddingVertical: 12,
   },
-  modalInput: { flex: 1, color: colors.text, fontWeight: "800", fontSize: 13, padding: 0 },
+  modalInput: { flex: 1, color: colors.text, fontFamily: fonts.bold, fontSize: 13, padding: 0 },
 
-  modalError: { marginTop: 6, color: colors.red, fontWeight: "700", fontSize: 11 },
+  modalError: { marginTop: 6, color: colors.red, fontFamily: fonts.bold, fontSize: 11 },
   modalSuccessRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10 },
-  modalSuccess: { color: colors.green, fontWeight: "700", fontSize: 12 },
+  modalSuccess: { color: colors.green, fontFamily: fonts.bold, fontSize: 12 },
 
   modalBtns: { flexDirection: "row", gap: 10, marginTop: 20 },
   modalCancelBtn: {
     flex: 1,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 10,
+    borderRadius: radius.input,
     paddingVertical: 12,
     alignItems: "center",
   },
-  modalCancelText: { color: colors.text, fontWeight: "900", fontSize: 13 },
+  modalCancelText: { color: colors.text, fontFamily: fonts.extrabold, fontSize: 13 },
   modalSaveBtn: {
     flex: 1,
     backgroundColor: colors.darkBtn,
-    borderRadius: 10,
+    borderRadius: radius.input,
     paddingVertical: 12,
     alignItems: "center",
   },
-  modalSaveText: { color: "#FFFFFF", fontWeight: "900", fontSize: 13 },
+  modalSaveText: { color: "#FFFFFF", fontFamily: fonts.extrabold, fontSize: 13 },
 });

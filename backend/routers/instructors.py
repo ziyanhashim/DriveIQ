@@ -80,19 +80,26 @@ def get_instructor_availability(
     date_to: Optional[str] = None,
     current_user=Depends(get_current_user),
 ):
-    """Get open time slots for an instructor."""
-    query: dict = {"instructor_id": instructor_id, "status": {"$in": ["open", "booked"]}}
+    """Get open time slots for an instructor. Auto-generates recurring weekly slots."""
+    from datetime import datetime
 
-    if date_from:
-        query["date"] = query.get("date", {})
-        query["date"]["$gte"] = date_from
-    if date_to:
-        query.setdefault("date", {})["$lte"] = date_to
+    today = now_utc()
+    today_str = today.strftime("%Y-%m-%d")
+    future = today + timedelta(days=14)
+    future_str = future.strftime("%Y-%m-%d")
 
-    if not date_from and not date_to:
-        today = now_utc().strftime("%Y-%m-%d")
-        future = (now_utc() + timedelta(days=14)).strftime("%Y-%m-%d")
-        query["date"] = {"$gte": today, "$lte": future}
+    start = date_from or today_str
+    end = date_to or future_str
+
+    # Auto-generate weekly recurring slots for dates that don't have any yet.
+    # Uses the instructor's existing slots as a weekly template (hours from any past/present week).
+    _ensure_recurring_slots(instructor_id, start, end)
+
+    query: dict = {
+        "instructor_id": instructor_id,
+        "status": {"$in": ["open", "booked"]},
+        "date": {"$gte": start, "$lte": end},
+    }
 
     slots = list(
         availability_col.find(query, {"_id": 0})
@@ -100,6 +107,76 @@ def get_instructor_availability(
     )
 
     return to_jsonable(slots)
+
+
+def _ensure_recurring_slots(instructor_id: str, date_from: str, date_to: str):
+    """
+    Auto-generate weekly recurring slots for an instructor.
+    Looks at what hours this instructor typically works (from existing slots),
+    then creates 'open' slots for any future dates that don't have slots yet.
+    """
+    from datetime import datetime
+
+    # Get the instructor's typical weekly pattern from existing slots
+    all_slots = list(availability_col.find(
+        {"instructor_id": instructor_id},
+        {"date": 1, "start_time": 1, "duration_min": 1},
+    ))
+
+    if not all_slots:
+        return  # No template to work from
+
+    # Build a pattern: for each weekday (0=Mon..6=Sun), what hours are typical?
+    weekday_hours: dict[int, set[int]] = {}
+    for s in all_slots:
+        try:
+            dt = datetime.fromisoformat(s["start_time"])
+            wd = dt.weekday()
+            weekday_hours.setdefault(wd, set()).add(dt.hour)
+        except (ValueError, KeyError):
+            continue
+
+    if not weekday_hours:
+        return
+
+    # Get dates that already have slots in the requested range
+    existing_dates = set()
+    for s in all_slots:
+        d = s.get("date", "")
+        if date_from <= d <= date_to:
+            existing_dates.add(d)
+
+    # Generate slots for missing dates
+    from datetime import timedelta
+    current = datetime.strptime(date_from, "%Y-%m-%d")
+    end = datetime.strptime(date_to, "%Y-%m-%d")
+    today = now_utc().replace(hour=0, minute=0, second=0, microsecond=0)
+
+    new_slots = []
+    while current <= end:
+        date_str = current.strftime("%Y-%m-%d")
+        wd = current.weekday()
+
+        # Only generate for future dates that don't already have slots
+        if current >= today and date_str not in existing_dates and wd in weekday_hours:
+            for hour in sorted(weekday_hours[wd]):
+                slot_start = current.replace(hour=hour, minute=0, second=0, microsecond=0)
+                duration = 60
+                new_slots.append({
+                    "slot_id": uuid.uuid4().hex,
+                    "instructor_id": instructor_id,
+                    "date": date_str,
+                    "start_time": slot_start.isoformat(),
+                    "end_time": (slot_start + timedelta(minutes=duration)).isoformat(),
+                    "duration_min": duration,
+                    "status": "open",
+                    "booked_by": None,
+                    "created_at": now_utc(),
+                })
+        current += timedelta(days=1)
+
+    if new_slots:
+        availability_col.insert_many(new_slots)
 
 
 @router.post("/availability")

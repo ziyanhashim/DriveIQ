@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { apiGet, apiPost, apiPatch } from "../../lib/api";
+import { colors, fonts, radius, space, shadow, tint } from "../../lib/theme";
 
 type SessionStatus = "scheduled" | "active" | "completed" | "cancelled" | "confirmed";
 
@@ -48,6 +49,7 @@ type ReportResponse = {
     probs?: Record<string, number>;
   };
   ai_feedback: Array<{ priority?: string; title: string; message: string; icon?: string }>;
+  instructor_feedback?: string;
   instructor_notes?: string;
 };
 
@@ -58,13 +60,37 @@ function safeParseMs(s?: string | null) {
 }
 
 function formatDate(ms: number) {
-  if (!ms) return "—";
+  if (!ms) return "";
   return new Date(ms).toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
 }
 
 function formatTime(ms: number) {
-  if (!ms) return "—";
+  if (!ms) return "";
   return new Date(ms).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+function fmtSessionLine(s: any, isConfirmed: boolean, schedMs: number) {
+  const road = (s as any).road_type || "";
+  const date = formatDate(schedMs);
+  const time = formatTime(schedMs);
+
+  // Try to build a readable line from available data
+  const created = s.created_at ? formatDate(safeParseMs(s.created_at)) : "";
+  const displayDate = date || created || "";
+  const displayTime = time || "";
+
+  if (isConfirmed) {
+    const parts = ["Booked"];
+    if (displayDate) parts.push(displayDate);
+    if (displayTime) parts.push(`at ${displayTime}`);
+    return parts.join(" · ");
+  }
+
+  const parts: string[] = [];
+  if (road) parts.push(`${road} road`);
+  if (displayDate) parts.push(displayDate);
+  if (displayTime) parts.push(displayTime);
+  return parts.join(" · ") || "Session";
 }
 
 function initials(name?: string, id?: string) {
@@ -115,6 +141,11 @@ function friendlyError(e: any): string {
   return "Request failed.";
 }
 
+// Module-level state that persists across tab navigation
+let _simStartTime = 0;
+let _simWindowsCache: any[] = [];
+let _simSessionId: string | null = null;
+
 export default function SessionsScreen() {
   const isMountedRef = useRef(true);
   useEffect(() => {
@@ -144,10 +175,23 @@ export default function SessionsScreen() {
   const [endingId, setEndingId] = useState<string | null>(null);
   const [generatingId, setGeneratingId] = useState<string | null>(null);
 
+  // road type picker modal
+  const [roadTypePickerId, setRoadTypePickerId] = useState<string | null>(null);
+
   // post-end modal (notes + generate report)
   const [postEndModal, setPostEndModal] = useState<{ sessionId: string; traineeName: string } | null>(null);
   const [instructorNotes, setInstructorNotes] = useState("");
   const [generating, setGenerating] = useState(false);
+
+  // live simulation state
+  const [simWindows, setSimWindows] = useState<any[]>([]);
+  const [simRevealed, setSimRevealed] = useState(0);
+  const [simRunning, setSimRunning] = useState(false);
+  const [simLoading, setSimLoading] = useState(false);
+  const [simSummaryFeedback, setSimSummaryFeedback] = useState<string | null>(null);
+  const [simInstructorFeedback, setSimInstructorFeedback] = useState<string | null>(null);
+  const [simPerformanceScore, setSimPerformanceScore] = useState<number>(0);
+  const simTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // detail modal
   const [detailSession, setDetailSession] = useState<SessionDoc | null>(null);
@@ -180,11 +224,13 @@ export default function SessionsScreen() {
     return () => clearInterval(t);
   }, [activeSession]);
 
+  // Track when simulation started locally (avoids UTC offset issues)
+  const simStartTimeRef = useRef<number>(0);
+
   const activeElapsed = useMemo(() => {
     if (!activeSession) return 0;
-    const startMs = safeParseMs(activeSession.started_at || null);
-    if (!startMs) return 0;
-    return Date.now() - startMs;
+    if (simStartTimeRef.current) return Date.now() - simStartTimeRef.current;
+    return 0;
   }, [activeSession, tick]);
 
   const loadLearners = async () => {
@@ -243,41 +289,165 @@ export default function SessionsScreen() {
     }
   };
 
+  // Restore simulation state when returning to this screen
+  const restoreSimulation = () => {
+    if (_simWindowsCache.length > 0 && _simStartTime > 0) {
+      const elapsedSec = (Date.now() - _simStartTime) / 1000;
+      const shouldBeRevealed = Math.min(Math.floor(elapsedSec / 12), _simWindowsCache.length);
+
+      setSimWindows(_simWindowsCache);
+      setSimRevealed(shouldBeRevealed);
+      setSimLoading(false);
+      simStartTimeRef.current = _simStartTime;
+
+      // Resume timer if not all revealed yet
+      if (shouldBeRevealed < _simWindowsCache.length) {
+        setSimRunning(true);
+        startRevealTimer(_simWindowsCache, shouldBeRevealed);
+      } else {
+        setSimRunning(false);
+      }
+    }
+  };
+
   useFocusEffect(
     useCallback(() => {
       loadLearners();
       loadSessions();
+      restoreSimulation();
       return () => {};
     }, [])
   );
 
   // Show a road type picker before starting
   const promptRoadType = (id: string) => {
-    Alert.alert(
-      "Select Road Type",
-      "What type of road is this session on?",
-      [
-        { text: "Secondary", onPress: () => startSession(id, "Secondary") },
-        { text: "Motorway", onPress: () => startSession(id, "Motorway") },
-        { text: "Cancel", style: "cancel" },
-      ]
-    );
+    setRoadTypePickerId(id);
   };
+
+  // Track pending simulation so it starts after sessions refresh
+  const pendingSimRef = useRef<string | null>(null);
 
   const startSession = async (id: string, roadType: string) => {
     try {
+      console.log("[START] Starting session", id, roadType);
       setLastAction(`Starting ${id}…`);
-      await apiPost(`/sessions/${id}/start`, { road_type: roadType });
+      setSimLoading(true);
+      simStartTimeRef.current = Date.now();
+      const result = await apiPost(`/sessions/${id}/start`, { road_type: roadType });
+      console.log("[START] Result:", JSON.stringify(result));
       if (!isMountedRef.current) return;
       setLastAction("Session started ✅");
+
+      // Get the session_id from the start response or by fetching sessions
+      const sessionId = result?.session_id;
+      if (sessionId) {
+        pendingSimRef.current = sessionId;
+      }
+
       await loadSessions();
+
+      // If we got a session_id from start, use it. Otherwise find active session.
+      if (sessionId) {
+        startSimulation(sessionId);
+      } else {
+        const refreshed = await apiGet("/sessions");
+        if (!isMountedRef.current) return;
+        const active = (Array.isArray(refreshed) ? refreshed : []).find((s: any) => s.status === "active");
+        if (active?.session_id) {
+          startSimulation(active.session_id);
+        } else {
+          setSimLoading(false);
+        }
+      }
     } catch (e: any) {
       if (!isMountedRef.current) return;
+      setSimLoading(false);
       const msg = friendlyError(e);
+      console.log("[START] Error:", msg, e);
       setLastAction(`Start failed ❌ ${msg}`);
       Alert.alert("Start", msg);
     }
   };
+
+  // ── Live simulation ───────────────────────────────────────────────────
+  const startSimulation = async (sessionId: string) => {
+    setSimLoading(true);
+    setSimWindows([]);
+    setSimRevealed(0);
+    setSimRunning(false);
+    setSimSummaryFeedback(null);
+    setSimInstructorFeedback(null);
+    setSimPerformanceScore(0);
+    setLastAction("Analyzing driving data...");
+
+    try {
+      const result = await apiPost(`/sessions/${sessionId}/simulate`, {});
+      if (!isMountedRef.current) return;
+
+      const windows = result.windows || [];
+
+      // Persist to module-level
+      _simWindowsCache = windows;
+      _simStartTime = Date.now();
+      _simSessionId = sessionId;
+
+      setSimWindows(windows);
+      setSimPerformanceScore(result.performance_score || 0);
+      setSimSummaryFeedback(result.summary_feedback || null);
+      setSimInstructorFeedback(result.instructor_feedback || null);
+      setSimLoading(false);
+      setSimRunning(true);
+      setSimRevealed(0);
+      simStartTimeRef.current = _simStartTime;
+
+      startRevealTimer(windows);
+    } catch (e: any) {
+      if (!isMountedRef.current) return;
+      setSimLoading(false);
+      const msg = friendlyError(e);
+      setLastAction(`Simulation failed: ${msg}`);
+    }
+  };
+
+  const startRevealTimer = (windows: any[], startFrom = 0) => {
+    if (simTimerRef.current) clearInterval(simTimerRef.current);
+    let count = startFrom;
+    simTimerRef.current = setInterval(() => {
+      count++;
+      if (count >= windows.length) {
+        if (simTimerRef.current) clearInterval(simTimerRef.current);
+        simTimerRef.current = null;
+      }
+      setSimRevealed(count);
+    }, 12000);
+  };
+
+  const stopSimulation = () => {
+    if (simTimerRef.current) {
+      clearInterval(simTimerRef.current);
+      simTimerRef.current = null;
+    }
+    setSimRunning(false);
+    setSimRevealed(simWindows.length || _simWindowsCache.length);
+  };
+
+  const clearSimulationState = () => {
+    stopSimulation();
+    setSimWindows([]);
+    setSimRevealed(0);
+    setSimLoading(false);
+    simStartTimeRef.current = 0;
+    _simStartTime = 0;
+    _simWindowsCache = [];
+    _simSessionId = null;
+  };
+
+  // Cleanup simulation timer on unmount
+  useEffect(() => {
+    return () => {
+      if (simTimerRef.current) clearInterval(simTimerRef.current);
+    };
+  }, []);
 
   const openReport = async (sessionId: string) => {
     if (openReportInFlight.current) return;
@@ -324,41 +494,37 @@ export default function SessionsScreen() {
     const learner = learnerMap.get(s?.trainee_id || "");
     const traineeName = learner ? labelLearner(learner) : (s?.trainee_name || "Unknown");
 
-    Alert.alert("End session?", "This will finalize the session.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "End",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            if (!isMountedRef.current) return;
+    const doEnd = window?.confirm?.("End session? This will finalize the session.") ?? true;
+    if (!doEnd) return;
 
-            setEndingId(sessionId);
-            setLastAction(`Ending ${sessionId}…`);
+    try {
+      if (!isMountedRef.current) return;
 
-            await apiPost(`/sessions/${sessionId}/end`, {});
-            if (!isMountedRef.current) return;
+      setEndingId(sessionId);
+      setLastAction(`Ending ${sessionId}…`);
 
-            setLastAction("Session ended ✅");
-            setTab("past");
+      await apiPost(`/sessions/${sessionId}/end`, {});
+      if (!isMountedRef.current) return;
 
-            await loadSessions();
+      setLastAction("Session ended ✅");
+      setTab("past");
 
-            // Show post-end modal for notes + report generation
-            setInstructorNotes("");
-            setPostEndModal({ sessionId, traineeName });
-          } catch (e2: any) {
-            if (!isMountedRef.current) return;
-            const msg = friendlyError(e2);
-            setLastAction(`End failed ❌ ${msg}`);
-            Alert.alert("End", msg);
-          } finally {
-            if (!isMountedRef.current) return;
-            setEndingId(null);
-          }
-        },
-      },
-    ]);
+      // Reset simulation state
+      clearSimulationState();
+
+      await loadSessions();
+
+      // Show post-end modal for notes + report generation
+      setInstructorNotes("");
+      setPostEndModal({ sessionId, traineeName });
+    } catch (e2: any) {
+      if (!isMountedRef.current) return;
+      const msg = friendlyError(e2);
+      setLastAction(`End failed ❌ ${msg}`);
+    } finally {
+      if (!isMountedRef.current) return;
+      setEndingId(null);
+    }
   };
 
   // Open generate modal from the sessions list (for already-completed sessions)
@@ -449,42 +615,153 @@ export default function SessionsScreen() {
   return (
     <ScrollView style={styles.page} contentContainerStyle={styles.content}>
       <Text style={styles.h1}>Sessions</Text>
-      <Text style={styles.h2}>Manage booked sessions, run them, then view the session analysis.</Text>
+      <Text style={styles.h2}>Manage your driving sessions and view analysis results.</Text>
 
       {/* Live session */}
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Live Session</Text>
-        {!activeSession ? (
+        {!activeSession && !simLoading ? (
           <Text style={styles.muted}>No active session</Text>
+        ) : !activeSession && simLoading ? (
+          <View style={{ alignItems: "center", paddingVertical: 24 }}>
+            <ActivityIndicator size="large" color="#7C3AED" />
+            <Text style={{ marginTop: 12, color: "#7C3AED", fontWeight: "900", fontSize: 13 }}>
+              Starting session...
+            </Text>
+          </View>
         ) : (() => {
           const activeLearner = learnerMap.get(activeSession.trainee_id);
           const activeName = activeLearner ? labelLearner(activeLearner) : (activeSession.trainee_name || "Student");
+          const roadType = (activeSession as any).road_type || "Secondary";
+
+          // Simulation stats
+          const revealedWindows = simWindows.slice(0, simRevealed);
+          const normalCount = revealedWindows.filter((w: any) => w.predicted_label === "Normal").length;
+          const aggressiveCount = revealedWindows.filter((w: any) => w.predicted_label === "Aggressive").length;
+          const drowsyCount = revealedWindows.filter((w: any) => w.predicted_label === "Drowsy").length;
+
           return (
             <View style={{ marginTop: 10 }}>
+              {/* Header */}
               <View style={styles.liveRow}>
                 <View style={styles.avatar}>
                   <Text style={styles.avatarText}>{initials(activeName)}</Text>
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.studentName}>{activeName}</Text>
-                  <Text style={styles.mutedSmall}>
-                    {(activeSession as any).road_type || "Secondary"} road
-                  </Text>
+                  <Text style={styles.mutedSmall}>{roadType} road</Text>
                 </View>
+                <Text style={styles.timer}>{msToClock(activeElapsed)}</Text>
               </View>
 
-              <Text style={styles.timer}>{msToClock(activeElapsed)}</Text>
+              {/* Simulation loading state */}
+              {simLoading && (
+                <View style={{ alignItems: "center", paddingVertical: 24 }}>
+                  <ActivityIndicator size="large" color="#7C3AED" />
+                  <Text style={{ marginTop: 12, color: "#7C3AED", fontWeight: "900", fontSize: 13 }}>
+                    Analyzing driving data...
+                  </Text>
+                  <Text style={{ marginTop: 4, color: "#98A2B3", fontWeight: "700", fontSize: 11 }}>
+                    Running ML pipeline and generating AI feedback
+                  </Text>
+                </View>
+              )}
 
+              {/* Progressive window reveal */}
+              {simWindows.length > 0 && !simLoading && (
+                <View style={{ marginTop: 12 }}>
+                  {/* Progress bar */}
+                  <View style={{ marginBottom: 10 }}>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
+                      <Text style={{ color: "#101828", fontWeight: "900", fontSize: 12 }}>
+                        {simRevealed < simWindows.length
+                          ? `Window ${simRevealed + 1} — Analyzing...`
+                          : `Session analysis complete`}
+                      </Text>
+                      <Text style={{ color: "#667085", fontWeight: "800", fontSize: 11 }}>
+                        {simRevealed} windows processed
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Running stats */}
+                  <View style={{ flexDirection: "row", gap: 8, marginBottom: 10 }}>
+                    <View style={{ flex: 1, backgroundColor: "#F0FDF4", borderRadius: 10, padding: 8, alignItems: "center" }}>
+                      <Text style={{ fontSize: 18, fontWeight: "900", color: "#16A34A" }}>{normalCount}</Text>
+                      <Text style={{ fontSize: 10, fontWeight: "800", color: "#16A34A" }}>Normal</Text>
+                    </View>
+                    <View style={{ flex: 1, backgroundColor: "#FEF2F2", borderRadius: 10, padding: 8, alignItems: "center" }}>
+                      <Text style={{ fontSize: 18, fontWeight: "900", color: "#DC2626" }}>{aggressiveCount}</Text>
+                      <Text style={{ fontSize: 10, fontWeight: "800", color: "#DC2626" }}>Aggressive</Text>
+                    </View>
+                    <View style={{ flex: 1, backgroundColor: "#FFFBEB", borderRadius: 10, padding: 8, alignItems: "center" }}>
+                      <Text style={{ fontSize: 18, fontWeight: "900", color: "#D97706" }}>{drowsyCount}</Text>
+                      <Text style={{ fontSize: 10, fontWeight: "800", color: "#D97706" }}>Drowsy</Text>
+                    </View>
+                  </View>
+
+                  {/* Window feed — show last 4 revealed windows */}
+                  {revealedWindows.slice(-4).reverse().map((w: any, idx: number) => {
+                    const isNewest = idx === 0;
+                    const labelColor = w.predicted_label === "Normal" ? "#16A34A"
+                      : w.predicted_label === "Aggressive" ? "#DC2626" : "#D97706";
+                    const labelBg = w.predicted_label === "Normal" ? "#F0FDF4"
+                      : w.predicted_label === "Aggressive" ? "#FEF2F2" : "#FFFBEB";
+                    return (
+                      <View key={w.window_id} style={{
+                        marginBottom: 8,
+                        backgroundColor: "#FFFFFF",
+                        borderWidth: 1,
+                        borderColor: isNewest ? labelColor : "#EAECF0",
+                        borderRadius: 12,
+                        padding: 10,
+                        opacity: isNewest ? 1 : 0.7,
+                      }}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                          <Text style={{ color: "#101828", fontWeight: "900", fontSize: 12 }}>
+                            Window {w.window_id + 1}
+                          </Text>
+                          <View style={{ backgroundColor: labelBg, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
+                            <Text style={{ color: labelColor, fontWeight: "900", fontSize: 10 }}>
+                              {w.predicted_label}
+                            </Text>
+                          </View>
+                          {w.alert_cause && w.alert_cause !== "No alert" && w.alert_cause !== "None" && (
+                            <Text style={{ color: "#98A2B3", fontWeight: "700", fontSize: 10 }}>
+                              {w.alert_cause}
+                            </Text>
+                          )}
+                          {w.severity > 0 && (
+                            <Text style={{ color: "#98A2B3", fontWeight: "700", fontSize: 10, marginLeft: "auto" }}>
+                              Severity: {Math.round(w.severity)}
+                            </Text>
+                          )}
+                        </View>
+                        {w.feedback && isNewest && (
+                          <Text style={{ marginTop: 6, color: "#667085", fontWeight: "700", fontSize: 11, lineHeight: 16 }}>
+                            {w.feedback}
+                          </Text>
+                        )}
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+
+              {/* End session button */}
               <Pressable
-                disabled={!!endingId || !activeSession.session_id}
-                onPress={() => activeSession.session_id && endSession(activeSession.session_id)}
+                disabled={!!endingId || !activeSession.session_id || simLoading}
+                onPress={() => {
+                  stopSimulation();
+                  activeSession.session_id && endSession(activeSession.session_id);
+                }}
                 style={({ pressed }) => [
                   styles.endBtn,
-                  !!endingId ? { opacity: 0.6 } : null,
+                  (!!endingId || simLoading) ? { opacity: 0.6 } : null,
                   pressed ? { opacity: 0.9 } : null,
                 ]}
               >
-                <Text style={styles.endBtnText}>{endingId ? "Ending…" : "End Session"}</Text>
+                <Text style={styles.endBtnText}>{endingId ? "Ending..." : "End Session"}</Text>
               </Pressable>
             </View>
           );
@@ -541,7 +818,7 @@ export default function SessionsScreen() {
           </Text>
         </View>
       ) : (
-        <View style={{ marginTop: 6 }}>
+        <View style={{ gap: 10 }}>
           {filtered.map((s) => {
             const learner = learnerMap.get(s.trainee_id);
             const name = learner ? labelLearner(learner) : (s.trainee_name || s.trainee_id);
@@ -571,9 +848,7 @@ export default function SessionsScreen() {
                       </View>
                     </View>
                     <Text style={styles.subLine} numberOfLines={1}>
-                      {isConfirmed
-                        ? `Booked · ${formatDate(schedMs)} at ${formatTime(schedMs)}`
-                        : `${(s as any).road_type || "Secondary"} road · ${formatDate(schedMs)} at ${formatTime(schedMs)}`}
+                      {fmtSessionLine(s, isConfirmed, schedMs)}
                     </Text>
                   </View>
                   <Text style={styles.chevron}>›</Text>
@@ -583,109 +858,6 @@ export default function SessionsScreen() {
           })}
         </View>
       )}
-
-      {/* Analysis Panel */}
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Session Analysis</Text>
-        {lastAction ? <Text style={styles.mutedSmall}>{lastAction}</Text> : null}
-
-        {reportLoading ? (
-          <View style={{ marginTop: 10 }}>
-            <ActivityIndicator />
-            <Text style={styles.muted}>Loading analysis…</Text>
-          </View>
-        ) : !selectedReport ? (
-          <Text style={styles.muted}>Open any session → "View analysis"</Text>
-        ) : (
-          <View style={{ marginTop: 10 }}>
-            <View style={styles.scoreRow}>
-              <Text style={styles.scoreBig}>{selectedReport.analysis?.overall ?? 0}</Text>
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{selectedReport.analysis?.badge ?? "Improving"}</Text>
-              </View>
-            </View>
-
-            <View style={styles.feedbackBox}>
-              <Text style={styles.feedbackTitle}>Key feedback</Text>
-              <Text style={styles.feedbackText}>
-                {selectedReport.analysis?.behavior ?? "Unknown"} • Confidence{" "}
-                {Math.round(Number(selectedReport.analysis?.confidence ?? 0) * 100)}%
-              </Text>
-
-              {selectedReport.analysis?.probs ? (
-                <Text style={styles.mutedSmall}>
-                  Normal: {Math.round((selectedReport.analysis.probs?.Normal ?? 0) * 100)}% • Aggressive:{" "}
-                  {Math.round((selectedReport.analysis.probs?.Aggressive ?? 0) * 100)}% • Drowsy:{" "}
-                  {Math.round((selectedReport.analysis.probs?.Drowsy ?? 0) * 100)}%
-                </Text>
-              ) : null}
-            </View>
-
-            {selectedReport.ai_feedback?.length ? (
-              <View style={{ marginTop: 10 }}>
-                {selectedReport.ai_feedback.slice(0, 3).map((f, idx) => (
-                  <View key={`${idx}-${f.title}`} style={styles.feedbackItem}>
-                    <Text style={styles.feedbackItemTitle}>
-                      {f.icon ? `${f.icon} ` : ""}{f.title}
-                    </Text>
-                    <Text style={styles.feedbackItemText}>{f.message}</Text>
-                  </View>
-                ))}
-              </View>
-            ) : null}
-
-            {/* Instructor Notes */}
-            <View style={styles.notesSection}>
-              <View style={styles.notesSectionHeader}>
-                <Text style={styles.notesSectionTitle}>📝 Instructor Notes</Text>
-                {!editingNotes && (
-                  <Pressable
-                    onPress={() => {
-                      setEditNotesDraft(selectedReport.instructor_notes || "");
-                      setEditingNotes(true);
-                    }}
-                  >
-                    <Text style={styles.editLink}>Edit</Text>
-                  </Pressable>
-                )}
-              </View>
-
-              {editingNotes ? (
-                <>
-                  <TextInput
-                    value={editNotesDraft}
-                    onChangeText={setEditNotesDraft}
-                    multiline
-                    numberOfLines={4}
-                    placeholder="Add your notes and suggestions…"
-                    placeholderTextColor="#98A2B3"
-                    style={styles.notesInput}
-                  />
-                  <View style={{ flexDirection: "row", gap: 8, marginTop: 8 }}>
-                    <Pressable
-                      onPress={() => setEditingNotes(false)}
-                      style={styles.cancelNoteBtn}
-                    >
-                      <Text style={styles.cancelNoteBtnText}>Cancel</Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={saveNotes}
-                      disabled={savingNotes}
-                      style={[styles.saveNoteBtn, savingNotes && { opacity: 0.6 }]}
-                    >
-                      <Text style={styles.saveNoteBtnText}>{savingNotes ? "Saving…" : "Save"}</Text>
-                    </Pressable>
-                  </View>
-                </>
-              ) : (
-                <Text style={styles.notesText}>
-                  {selectedReport.instructor_notes?.trim() || "No notes added yet."}
-                </Text>
-              )}
-            </View>
-          </View>
-        )}
-      </View>
 
       {/* Session Detail Modal */}
       <Modal
@@ -845,13 +1017,6 @@ export default function SessionsScreen() {
             <View style={styles.modalActions}>
               <Pressable
                 disabled={generating}
-                onPress={() => { if (!generating) setPostEndModal(null); }}
-                style={[styles.modalSkipBtn, generating && { opacity: 0.4 }]}
-              >
-                <Text style={styles.modalSkipText}>Skip for now</Text>
-              </Pressable>
-              <Pressable
-                disabled={generating}
                 onPress={generateReport}
                 style={[styles.modalGenerateBtn, generating && { opacity: 0.6 }]}
               >
@@ -865,6 +1030,52 @@ export default function SessionsScreen() {
                 )}
               </Pressable>
             </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Road Type Picker Modal */}
+      <Modal
+        visible={!!roadTypePickerId}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRoadTypePickerId(null)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setRoadTypePickerId(null)}
+        >
+          <Pressable style={[styles.modalCard, { gap: 12 }]} onPress={(e) => e.stopPropagation()}>
+            <Text style={styles.modalTitle}>Select Road Type</Text>
+            <Text style={{ color: "#667085", fontWeight: "700", fontSize: 13 }}>
+              What type of road is this session on?
+            </Text>
+            <Pressable
+              onPress={() => {
+                const id = roadTypePickerId!;
+                setRoadTypePickerId(null);
+                startSession(id, "Motorway");
+              }}
+              style={({ pressed }) => [styles.detailActionBtn, pressed && { opacity: 0.9 }]}
+            >
+              <Text style={styles.actionBtnText}>Motorway</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                const id = roadTypePickerId!;
+                setRoadTypePickerId(null);
+                startSession(id, "Secondary");
+              }}
+              style={({ pressed }) => [styles.detailActionBtn, { backgroundColor: "#2563EB" }, pressed && { opacity: 0.9 }]}
+            >
+              <Text style={styles.actionBtnText}>Secondary</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setRoadTypePickerId(null)}
+              style={({ pressed }) => [styles.modalSkipBtn, pressed && { opacity: 0.9 }]}
+            >
+              <Text style={styles.modalSkipText}>Cancel</Text>
+            </Pressable>
           </Pressable>
         </Pressable>
       </Modal>
@@ -887,327 +1098,234 @@ function Meta({ icon, label, value }: { icon: string; label: string; value: stri
 }
 
 const styles = StyleSheet.create({
-  page: { flex: 1, backgroundColor: "#F5F7FB" },
-  content: { padding: 16, paddingBottom: 26 },
+  page: { flex: 1, backgroundColor: colors.pageBg },
+  content: { padding: space.page, paddingBottom: 26, gap: 14 },
 
-  h1: { fontSize: 22, fontWeight: "900", color: "#101828" },
-  h2: { marginTop: 6, fontSize: 12, fontWeight: "700", color: "#667085", marginBottom: 14 },
+  h1: { fontSize: 22, fontFamily: fonts.extrabold, color: colors.textAlt, letterSpacing: -0.5 },
+  h2: { marginTop: 4, fontSize: 12, fontFamily: fonts.bold, color: colors.subtext, marginBottom: 6 },
 
   card: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.cardBg,
     borderWidth: 1,
-    borderColor: "#EAECF0",
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 14,
+    borderColor: colors.border,
+    borderRadius: radius.cardLg,
+    padding: space.lg,
+    ...shadow.sm,
   },
-  sectionTitle: { color: "#101828", fontWeight: "900", fontSize: 13 },
-  muted: { marginTop: 8, color: "#667085", fontWeight: "800", fontSize: 12 },
-  mutedSmall: { marginTop: 6, color: "#667085", fontWeight: "800", fontSize: 11 },
-  liveRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  liveLabel: { color: "#667085", fontWeight: "900" },
-  liveId: { flex: 1, color: "#101828", fontWeight: "900" },
-  timer: { marginTop: 10, fontSize: 28, fontWeight: "900", color: "#101828" },
+  sectionTitle: { color: colors.textAlt, fontFamily: fonts.extrabold, fontSize: 14 },
+  muted: { marginTop: 8, color: colors.subtext, fontFamily: fonts.bold, fontSize: 12 },
+  mutedSmall: { marginTop: 6, color: colors.subtext, fontFamily: fonts.bold, fontSize: 11 },
+  liveRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  liveLabel: { color: colors.subtext, fontFamily: fonts.extrabold },
+  liveId: { flex: 1, color: colors.textAlt, fontFamily: fonts.extrabold },
+  timer: { fontSize: 22, fontFamily: fonts.extrabold, color: colors.textAlt, fontVariant: ["tabular-nums"] },
 
   endBtn: {
-    marginTop: 10,
+    marginTop: 12,
     minHeight: 48,
-    borderRadius: 14,
-    backgroundColor: "#E11D48",
+    borderRadius: radius.card,
+    backgroundColor: colors.redDark,
     alignItems: "center",
     justifyContent: "center",
   },
-  endBtnText: { color: "#fff", fontWeight: "900" },
+  endBtnText: { color: "#fff", fontFamily: fonts.extrabold, fontSize: 14 },
 
-  tabsWrap: { flexDirection: "row", backgroundColor: "#EEF2F6", borderRadius: 14, padding: 4, marginBottom: 12 },
-  tabBtn: { flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: "center" },
-  tabBtnOn: { backgroundColor: "#FFFFFF" },
-  tabText: { color: "#667085", fontWeight: "900", fontSize: 12 },
-  tabTextOn: { color: "#101828" },
+  tabsWrap: { flexDirection: "row", backgroundColor: colors.pageBg, borderRadius: radius.card, padding: 4, borderWidth: 1, borderColor: colors.border },
+  tabBtn: { flex: 1, paddingVertical: 10, borderRadius: radius.input, alignItems: "center" },
+  tabBtnOn: { backgroundColor: colors.cardBg, ...shadow.sm },
+  tabText: { color: colors.subtext, fontFamily: fonts.bold, fontSize: 12 },
+  tabTextOn: { color: colors.textAlt },
 
   filterCard: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.cardBg,
     borderWidth: 1,
-    borderColor: "#EAECF0",
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 8,
+    borderColor: colors.border,
+    borderRadius: radius.cardLg,
+    padding: space.md,
     gap: 10,
   },
   searchWrap: {
     minHeight: 46,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F9FAFB",
+    backgroundColor: colors.pageBg,
     borderWidth: 1,
-    borderColor: "#EAECF0",
-    borderRadius: 12,
+    borderColor: colors.border,
+    borderRadius: radius.input,
     paddingHorizontal: 12,
   },
   searchIcon: { marginRight: 8, fontSize: 14 },
-  searchInput: { flex: 1, color: "#101828", fontSize: 13, fontWeight: "700" },
+  searchInput: { flex: 1, color: colors.textAlt, fontSize: 13, fontFamily: fonts.bold },
   refreshBtn: {
     minHeight: 46,
     paddingHorizontal: 14,
-    borderRadius: 12,
+    borderRadius: radius.input,
     borderWidth: 1,
-    borderColor: "#EAECF0",
-    backgroundColor: "#FFFFFF",
+    borderColor: colors.border,
+    backgroundColor: colors.cardBg,
     alignItems: "center",
     justifyContent: "center",
   },
-  refreshBtnText: { color: "#101828", fontWeight: "900", fontSize: 12 },
+  refreshBtnText: { color: colors.textAlt, fontFamily: fonts.extrabold, fontSize: 12 },
 
   sessionRow: {
-    marginTop: 10,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.cardBg,
     borderWidth: 1,
-    borderColor: "#EAECF0",
-    borderRadius: 16,
-    padding: 14,
+    borderColor: colors.border,
+    borderRadius: radius.cardLg,
+    padding: space.lg,
     gap: 10,
   },
   sessionTop: { flexDirection: "row", alignItems: "center", gap: 12 },
-  avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: "#EEF2FF", alignItems: "center", justifyContent: "center" },
-  avatarText: { color: "#4F46E5", fontWeight: "900", fontSize: 12 },
+  avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: tint.purple.bg, alignItems: "center", justifyContent: "center" },
+  avatarText: { color: colors.purpleDark, fontFamily: fonts.extrabold, fontSize: 12 },
   nameRow: { flexDirection: "row", alignItems: "center", gap: 10, flexWrap: "wrap" },
-  studentName: { color: "#101828", fontWeight: "900", fontSize: 13, maxWidth: 240 },
-  subLine: { marginTop: 6, color: "#667085", fontWeight: "800", fontSize: 11 },
+  studentName: { color: colors.textAlt, fontFamily: fonts.bold, fontSize: 14 },
+  subLine: { marginTop: 4, color: colors.subtext, fontFamily: fonts.medium, fontSize: 12 },
 
-  pill: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
-  pillText: { fontWeight: "900", fontSize: 11 },
+  pill: { borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 },
+  pillText: { fontFamily: fonts.extrabold, fontSize: 11 },
 
   metaRow: { flexDirection: "row", gap: 14, flexWrap: "wrap" },
   metaItem: { flexDirection: "row", alignItems: "center", gap: 8 },
   metaIcon: { fontSize: 14 },
-  metaLabel: { color: "#667085", fontWeight: "800", fontSize: 11 },
-  metaValue: { color: "#101828", fontWeight: "900", fontSize: 12 },
+  metaLabel: { color: colors.subtext, fontFamily: fonts.bold, fontSize: 11 },
+  metaValue: { color: colors.textAlt, fontFamily: fonts.extrabold, fontSize: 12 },
 
   actionsRow: { flexDirection: "row", gap: 10, flexWrap: "wrap" },
   actionBtn: {
-    minHeight: 44,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: "#0B1220",
-    alignItems: "center",
-    justifyContent: "center",
+    minHeight: 44, paddingHorizontal: 16, borderRadius: radius.input,
+    backgroundColor: colors.darkBtn, alignItems: "center", justifyContent: "center",
   },
   actionBtnEnd: {
-    minHeight: 44,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: "#E11D48",
-    alignItems: "center",
-    justifyContent: "center",
+    minHeight: 44, paddingHorizontal: 16, borderRadius: radius.input,
+    backgroundColor: colors.redDark, alignItems: "center", justifyContent: "center",
   },
   actionBtnOutline: {
-    minHeight: 44,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#D0D5DD",
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
+    minHeight: 44, paddingHorizontal: 16, borderRadius: radius.input,
+    borderWidth: 1, borderColor: colors.borderMid, backgroundColor: colors.cardBg,
+    alignItems: "center", justifyContent: "center",
   },
   actionBtnGenerate: {
-    minHeight: 44,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: "#7C3AED",
-    alignItems: "center",
-    justifyContent: "center",
+    minHeight: 44, paddingHorizontal: 16, borderRadius: radius.input,
+    backgroundColor: colors.purpleDark, alignItems: "center", justifyContent: "center",
   },
-  actionBtnText: { color: "#fff", fontWeight: "900" },
-  actionBtnOutlineText: { color: "#101828", fontWeight: "900" },
+  actionBtnText: { color: "#fff", fontFamily: fonts.extrabold, fontSize: 13 },
+  actionBtnOutlineText: { color: colors.textAlt, fontFamily: fonts.extrabold, fontSize: 13 },
   actionBtnDisabled: { opacity: 0.35 },
 
   scoreRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  scoreBig: { fontSize: 44, fontWeight: "900", color: "#101828" },
-  badge: { backgroundColor: "#0B1220", borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8 },
-  badgeText: { color: "#fff", fontWeight: "900" },
+  scoreBig: { fontSize: 44, fontFamily: fonts.extrabold, color: colors.textAlt },
+  badge: { backgroundColor: colors.darkBtn, borderRadius: radius.pill, paddingHorizontal: 14, paddingVertical: 8 },
+  badgeText: { color: "#fff", fontFamily: fonts.extrabold, fontSize: 12 },
 
-  feedbackBox: { marginTop: 10, backgroundColor: "#F9FAFB", borderWidth: 1, borderColor: "#EAECF0", borderRadius: 14, padding: 12 },
-  feedbackTitle: { color: "#101828", fontWeight: "900" },
-  feedbackText: { marginTop: 6, color: "#667085", fontWeight: "800" },
+  feedbackBox: { marginTop: 10, backgroundColor: colors.pageBg, borderWidth: 1, borderColor: colors.border, borderRadius: radius.card, padding: space.md },
+  feedbackTitle: { color: colors.textAlt, fontFamily: fonts.extrabold, fontSize: 13 },
+  feedbackText: { marginTop: 6, color: colors.subtext, fontFamily: fonts.bold, fontSize: 12, lineHeight: 18 },
 
-  feedbackItem: { marginTop: 10, backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#EAECF0", borderRadius: 14, padding: 12 },
-  feedbackItemTitle: { color: "#101828", fontWeight: "900" },
-  feedbackItemText: { marginTop: 6, color: "#667085", fontWeight: "800" },
+  feedbackItem: { marginTop: 10, backgroundColor: colors.cardBg, borderWidth: 1, borderColor: colors.border, borderRadius: radius.card, padding: space.md },
+  feedbackItemTitle: { color: colors.textAlt, fontFamily: fonts.extrabold, fontSize: 13 },
+  feedbackItemText: { marginTop: 6, color: colors.subtext, fontFamily: fonts.bold, fontSize: 12, lineHeight: 18 },
 
-  // Instructor notes in analysis panel
-  notesSection: { marginTop: 14, backgroundColor: "#F9FAFB", borderWidth: 1, borderColor: "#EAECF0", borderRadius: 14, padding: 12 },
+  // Instructor notes
+  notesSection: { marginTop: 14, backgroundColor: colors.pageBg, borderWidth: 1, borderColor: colors.border, borderRadius: radius.card, padding: space.md },
   notesSectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
-  notesSectionTitle: { color: "#101828", fontWeight: "900", fontSize: 13 },
-  editLink: { color: "#7C3AED", fontWeight: "900", fontSize: 12 },
-  notesText: { color: "#667085", fontWeight: "700", fontSize: 13, lineHeight: 20 },
+  notesSectionTitle: { color: colors.textAlt, fontFamily: fonts.extrabold, fontSize: 13 },
+  editLink: { color: colors.purpleDark, fontFamily: fonts.extrabold, fontSize: 12 },
+  notesText: { color: colors.subtext, fontFamily: fonts.medium, fontSize: 13, lineHeight: 20 },
   notesInput: {
-    minHeight: 80,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#EAECF0",
-    backgroundColor: "#FFFFFF",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontWeight: "700",
-    color: "#101828",
-    fontSize: 13,
-    textAlignVertical: "top",
+    minHeight: 80, borderRadius: radius.input, borderWidth: 1, borderColor: colors.border,
+    backgroundColor: colors.cardBg, paddingHorizontal: 12, paddingVertical: 10,
+    fontFamily: fonts.medium, color: colors.textAlt, fontSize: 13, textAlignVertical: "top",
   },
   cancelNoteBtn: {
-    flex: 1,
-    minHeight: 40,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#EAECF0",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#FFFFFF",
+    flex: 1, minHeight: 40, borderRadius: radius.input, borderWidth: 1, borderColor: colors.border,
+    alignItems: "center", justifyContent: "center", backgroundColor: colors.cardBg,
   },
-  cancelNoteBtnText: { color: "#667085", fontWeight: "900", fontSize: 12 },
+  cancelNoteBtnText: { color: colors.subtext, fontFamily: fonts.extrabold, fontSize: 12 },
   saveNoteBtn: {
-    flex: 1,
-    minHeight: 40,
-    borderRadius: 10,
-    backgroundColor: "#7C3AED",
-    alignItems: "center",
-    justifyContent: "center",
+    flex: 1, minHeight: 40, borderRadius: radius.input,
+    backgroundColor: colors.purpleDark, alignItems: "center", justifyContent: "center",
   },
-  saveNoteBtnText: { color: "#fff", fontWeight: "900", fontSize: 12 },
+  saveNoteBtnText: { color: "#fff", fontFamily: fonts.extrabold, fontSize: 12 },
 
-  center: { alignItems: "center", justifyContent: "center", padding: 16 },
-  centerText: { marginTop: 10, fontWeight: "800", color: "#64748B" },
+  center: { alignItems: "center", justifyContent: "center", padding: space.lg },
+  centerText: { marginTop: 10, fontFamily: fonts.bold, color: colors.subtext },
 
-  empty: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: "#EAECF0", borderRadius: 16, padding: 16, alignItems: "center" },
-  emptyTitle: { color: "#101828", fontWeight: "900", fontSize: 13 },
-  emptySub: { marginTop: 6, color: "#667085", fontWeight: "800", fontSize: 12, textAlign: "center" },
+  empty: { backgroundColor: colors.cardBg, borderWidth: 1, borderColor: colors.border, borderRadius: radius.cardLg, padding: space.lg, alignItems: "center" },
+  emptyTitle: { color: colors.textAlt, fontFamily: fonts.extrabold, fontSize: 13 },
+  emptySub: { marginTop: 6, color: colors.subtext, fontFamily: fonts.bold, fontSize: 12, textAlign: "center" },
 
-  chevron: { fontSize: 20, color: "#98A2B3", fontWeight: "700", marginLeft: 4 },
+  chevron: { fontSize: 18, color: colors.muted, marginLeft: 4 },
 
   // Detail modal
   detailModalCard: {
-    width: "100%",
-    maxWidth: 500,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    padding: 24,
-    gap: 16,
+    width: "100%", maxWidth: 500, backgroundColor: colors.cardBg,
+    borderRadius: radius.cardXl, padding: 24, gap: 16, ...shadow.cardRaised,
   },
   detailHeader: { flexDirection: "row", alignItems: "center", gap: 14 },
   detailAvatarLg: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: "#EEF2FF",
-    alignItems: "center",
-    justifyContent: "center",
+    width: 54, height: 54, borderRadius: 27,
+    backgroundColor: tint.purple.bg, alignItems: "center", justifyContent: "center",
   },
-  detailAvatarText: { color: "#4F46E5", fontWeight: "900", fontSize: 16 },
-  detailName: { color: "#101828", fontWeight: "900", fontSize: 16 },
+  detailAvatarText: { color: colors.purpleDark, fontFamily: fonts.extrabold, fontSize: 16 },
+  detailName: { color: colors.textAlt, fontFamily: fonts.extrabold, fontSize: 16 },
   detailCloseBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "#F2F4F7",
-    alignItems: "center",
-    justifyContent: "center",
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: colors.pageBg, alignItems: "center", justifyContent: "center",
   },
-  detailCloseText: { color: "#667085", fontWeight: "900", fontSize: 14 },
+  detailCloseText: { color: colors.subtext, fontFamily: fonts.extrabold, fontSize: 14 },
   detailGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 16,
-    backgroundColor: "#F9FAFB",
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: "#EAECF0",
+    flexDirection: "row", flexWrap: "wrap", gap: 16,
+    backgroundColor: colors.pageBg, borderRadius: radius.card, padding: 14,
+    borderWidth: 1, borderColor: colors.border,
   },
   detailActions: { flexDirection: "column", gap: 10 },
   detailActionBtn: {
-    minHeight: 48,
-    borderRadius: 14,
-    backgroundColor: "#0B1220",
-    alignItems: "center",
-    justifyContent: "center",
+    minHeight: 48, borderRadius: radius.card,
+    backgroundColor: colors.darkBtn, alignItems: "center", justifyContent: "center",
   },
   detailActionBtnEnd: {
-    minHeight: 48,
-    borderRadius: 14,
-    backgroundColor: "#E11D48",
-    alignItems: "center",
-    justifyContent: "center",
+    minHeight: 48, borderRadius: radius.card,
+    backgroundColor: colors.redDark, alignItems: "center", justifyContent: "center",
   },
   detailActionBtnOutline: {
-    minHeight: 48,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "#D0D5DD",
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
+    minHeight: 48, borderRadius: radius.card, borderWidth: 1,
+    borderColor: colors.borderMid, backgroundColor: colors.cardBg,
+    alignItems: "center", justifyContent: "center",
   },
   detailActionBtnGenerate: {
-    minHeight: 48,
-    borderRadius: 14,
-    backgroundColor: "#7C3AED",
-    alignItems: "center",
-    justifyContent: "center",
+    minHeight: 48, borderRadius: radius.card,
+    backgroundColor: colors.purpleDark, alignItems: "center", justifyContent: "center",
   },
 
-  // Post-end modal
+  // Modals
   modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
+    flex: 1, backgroundColor: "rgba(0,0,0,0.45)",
+    alignItems: "center", justifyContent: "center", padding: 24,
   },
   modalCard: {
-    width: "100%",
-    maxWidth: 480,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    padding: 24,
-    gap: 6,
+    width: "100%", maxWidth: 480, backgroundColor: colors.cardBg,
+    borderRadius: radius.cardXl, padding: 24, gap: 6, ...shadow.cardRaised,
   },
-  modalTitle: { fontSize: 18, fontWeight: "900", color: "#101828" },
-  modalSub: { fontSize: 13, fontWeight: "700", color: "#667085", marginBottom: 10 },
-  modalLabel: { fontSize: 13, fontWeight: "900", color: "#101828", marginTop: 8 },
-  modalHint: { fontSize: 11, fontWeight: "700", color: "#98A2B3", marginBottom: 6 },
+  modalTitle: { fontSize: 18, fontFamily: fonts.extrabold, color: colors.textAlt },
+  modalSub: { fontSize: 13, fontFamily: fonts.bold, color: colors.subtext, marginBottom: 10 },
+  modalLabel: { fontSize: 13, fontFamily: fonts.extrabold, color: colors.textAlt, marginTop: 8 },
+  modalHint: { fontSize: 11, fontFamily: fonts.bold, color: colors.muted, marginBottom: 6 },
   modalTextInput: {
-    minHeight: 110,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#EAECF0",
-    backgroundColor: "#F9FAFB",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontWeight: "700",
-    color: "#101828",
-    fontSize: 13,
-    textAlignVertical: "top",
-    marginTop: 4,
+    minHeight: 110, borderRadius: radius.input, borderWidth: 1, borderColor: colors.border,
+    backgroundColor: colors.pageBg, paddingHorizontal: 14, paddingVertical: 12,
+    fontFamily: fonts.medium, color: colors.textAlt, fontSize: 13, textAlignVertical: "top", marginTop: 4,
   },
   modalActions: { flexDirection: "row", gap: 10, marginTop: 16 },
   modalSkipBtn: {
-    flex: 1,
-    minHeight: 50,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: "#EAECF0",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#FFFFFF",
+    flex: 1, minHeight: 50, borderRadius: radius.card, borderWidth: 1, borderColor: colors.border,
+    alignItems: "center", justifyContent: "center", backgroundColor: colors.cardBg,
   },
-  modalSkipText: { color: "#667085", fontWeight: "900", fontSize: 13 },
+  modalSkipText: { color: colors.subtext, fontFamily: fonts.extrabold, fontSize: 13 },
   modalGenerateBtn: {
-    flex: 2,
-    minHeight: 50,
-    borderRadius: 14,
-    backgroundColor: "#7C3AED",
-    alignItems: "center",
-    justifyContent: "center",
+    flex: 2, minHeight: 50, borderRadius: radius.card,
+    backgroundColor: colors.purpleDark, alignItems: "center", justifyContent: "center",
   },
-  modalGenerateBtnText: { color: "#fff", fontWeight: "900", fontSize: 13 },
+  modalGenerateBtnText: { color: "#fff", fontFamily: fonts.extrabold, fontSize: 13 },
 });

@@ -15,6 +15,9 @@ JWT_EXPIRE_MIN = int(os.getenv("JWT_EXPIRE_MIN", "60"))
 # CORS
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",")
 
+# OpenAI
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+
 # Dataset root (optional, used by ingest_service)
 DATASETS_ROOT = os.getenv("DATASETS_ROOT", "")
 

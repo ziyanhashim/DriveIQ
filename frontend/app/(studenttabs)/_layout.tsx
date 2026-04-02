@@ -176,8 +176,8 @@ const s = StyleSheet.create({
   tabPressed:    { opacity: 0.7 },
   tabIcon:       { fontSize: 14, color: colors.subtext },
   tabIconActive: { color: "#FFFFFF" },
-  tabLabel:      { fontSize: 13, fontFamily: fonts.bold, color: "#374151" },
-  tabLabelActive:{ color: "#FFFFFF", fontFamily: fonts.bold, fontSize: 13 },
+  tabLabel:      { fontSize: 13, fontFamily: fonts.bold, color: "#374151", userSelect: "none" },
+  tabLabelActive:{ color: "#FFFFFF", fontFamily: fonts.bold, fontSize: 13, userSelect: "none" },
 
   // User pill
   userWrap:   { flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: space.sm, paddingVertical: 6, borderRadius: radius.sm },
@@ -196,8 +196,8 @@ const s = StyleSheet.create({
   mobileItem:      { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: space.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.borderFaint },
   mobileItemActive:{ backgroundColor: colors.purpleLight },
   mobileIcon:      { fontSize: 16, color: colors.subtext },
-  mobileLabel:     { fontSize: 14, fontFamily: fonts.bold, color: "#374151" },
-  mobileLabelActive:{ color: colors.purpleDark },
+  mobileLabel:     { fontSize: 14, fontFamily: fonts.bold, color: "#374151", userSelect: "none" },
+  mobileLabelActive:{ color: colors.purpleDark, userSelect: "none" },
 
   // Content
   content: { flex: 1, zIndex: 1 },

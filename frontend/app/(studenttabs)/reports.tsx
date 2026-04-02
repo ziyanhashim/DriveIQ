@@ -154,7 +154,7 @@ export default function ReportsListScreen() {
           <View style={ls.statsRow}>
             <MetricCard label="Total Sessions" value={sessions.length} icon="📊" tintKey="blue" />
             <MetricCard label="Avg Score" value={`${avgScore}%`} icon="🎯" tintKey={avgScore >= 80 ? "green" : avgScore >= 60 ? "yellow" : "red"} />
-            <MetricCard label="Pass Rate" value={`${passRate}%`} icon="✅" tintKey="green" subtitle={`${sessions.filter((s) => s.passed).length} passed`} />
+            <MetricCard label="Good Sessions" value={`${passRate}%`} icon="✅" tintKey="green" subtitle={`${sessions.filter((s) => s.passed).length} above target`} />
           </View>
           </FadeInView>
         )}
