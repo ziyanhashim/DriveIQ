@@ -630,8 +630,8 @@ export default function SessionsScreen() {
             </Text>
           </View>
         ) : (() => {
-          const activeLearner = learnerMap.get(activeSession.trainee_id);
-          const activeName = activeLearner ? labelLearner(activeLearner) : (activeSession.trainee_name || "Student");
+          const activeLearner = learnerMap.get(activeSession!.trainee_id);
+          const activeName = activeLearner ? labelLearner(activeLearner) : (activeSession!.trainee_name || "Student");
           const roadType = (activeSession as any).road_type || "Secondary";
 
           // Simulation stats
@@ -750,10 +750,10 @@ export default function SessionsScreen() {
 
               {/* End session button */}
               <Pressable
-                disabled={!!endingId || !activeSession.session_id || simLoading}
+                disabled={!!endingId || !activeSession?.session_id || simLoading}
                 onPress={() => {
                   stopSimulation();
-                  activeSession.session_id && endSession(activeSession.session_id);
+                  activeSession?.session_id && endSession(activeSession.session_id);
                 }}
                 style={({ pressed }) => [
                   styles.endBtn,

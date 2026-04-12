@@ -44,6 +44,7 @@ type SessionDoc = {
 
 type ResultDoc = {
   session_id: string; instructor_name?: string;
+  performance_score?: number;
   analysis?: { behavior: string; overall: number; badge: string; confidence: number };
   ai_feedback?: any[]; instructor_comment?: { text: string; rating: number; date: string };
   created_at?: string;
