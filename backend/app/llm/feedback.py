@@ -36,10 +36,20 @@ class SessionFeedback(BaseModel):
     model_config = ConfigDict(extra="forbid")
     session_key: str
     student_feedback: str = Field(
-        ..., description="2-4 sentences addressed to the driver."
+        ...,
+        description=(
+            "6-8 sentences in a single paragraph addressed to the driver ('you'). "
+            "Be specific: reference exact alert types observed, their frequency, "
+            "severity patterns, and provide concrete actionable improvement steps."
+        ),
     )
     instructor_feedback: str = Field(
-        ..., description="2-4 sentences addressed to the instructor."
+        ...,
+        description=(
+            "6-8 sentences in a single paragraph addressed to the instructor ('the student'). "
+            "Reference specific driving patterns observed, risk areas, severity trends, "
+            "and provide targeted teaching recommendations."
+        ),
     )
 
 
@@ -139,27 +149,35 @@ def _build_session_prompt(
     performance_score: float,
     total_windows: int,
     abnormal_count: int,
-    top_causes: List[str],
+    cause_distribution: str,
+    severity_stats: str,
+    window_summaries: str,
+    temporal_pattern: str,
 ) -> str:
     pct_abnormal = (
         round(100 * abnormal_count / total_windows, 1) if total_windows > 0 else 0
     )
-    top_causes_str = ", ".join(top_causes) or "None recorded"
 
     return (
         "You are DriveIQ, an AI driving mentor.\n"
-        "Generate TWO short feedback paragraphs for a completed driving session.\n"
+        "Generate TWO detailed feedback paragraphs for a completed driving session.\n"
         f"Tone: {_tone_for_score(performance_score)}.\n\n"
         f"session_key:       {session_key}\n"
         f"road_type:         {road_type}\n"
         f"performance_score: {performance_score:.1f}/100\n"
         f"total_windows:     {total_windows}\n"
-        f"abnormal_windows:  {abnormal_count} ({pct_abnormal}%)\n"
-        f"top_alert_causes:  {top_causes_str}\n\n"
+        f"abnormal_windows:  {abnormal_count} ({pct_abnormal}%)\n\n"
+        f"Alert cause distribution:\n{cause_distribution}\n\n"
+        f"Severity statistics: {severity_stats}\n\n"
+        f"Temporal pattern: {temporal_pattern}\n\n"
+        f"Abnormal window details:\n{window_summaries}\n\n"
         "Rules:\n"
-        "  - student_feedback: 2-4 sentences, speak directly to the driver ('you').\n"
-        "  - instructor_feedback: 2-4 sentences, speak to the instructor ('the student').\n"
-        "  - No invented data beyond what is listed above.\n"
+        "  - student_feedback: 6-8 sentences, speak directly to the driver ('you').\n"
+        "    Reference specific alert types, their frequency, severity patterns,\n"
+        "    and provide concrete actionable improvement recommendations.\n"
+        "  - instructor_feedback: 6-8 sentences, speak to the instructor ('the student').\n"
+        "    Reference specific driving patterns, risk areas, and teaching recommendations.\n"
+        "  - Use the window details above as evidence. Do not invent data.\n"
         "  - No bullet points or headings inside the paragraphs.\n"
     )
 
@@ -182,15 +200,58 @@ def generate_session_feedback(
 
     # Aggregate stats
     total_windows = len(windows)
-    abnormal_count = sum(
-        1 for w in windows if w.get("predicted_label") in ("Aggressive", "Drowsy")
-    )
+    abnormal_windows = [
+        w for w in windows if w.get("predicted_label") in ("Aggressive", "Drowsy")
+    ]
+    abnormal_count = len(abnormal_windows)
+
+    # Full cause distribution (not just top 3)
     causes = Counter(
         w.get("alert_cause")
         for w in windows
         if w.get("alert_cause") and w.get("alert_cause") not in ("None", "No alert")
     )
-    top_causes = [c for c, _ in causes.most_common(3)]
+    cause_distribution = "\n".join(
+        f"  - {cause}: {count} window(s)" for cause, count in causes.most_common()
+    ) or "  No alerts recorded"
+
+    # Severity statistics for abnormal windows
+    severities = [w.get("severity", 0) for w in abnormal_windows if w.get("severity")]
+    if severities:
+        severity_stats = (
+            f"min={min(severities):.2f}, max={max(severities):.2f}, "
+            f"avg={sum(severities)/len(severities):.2f} (scale 0-10)"
+        )
+    else:
+        severity_stats = "No severity data"
+
+    # Condensed summaries of each abnormal window (include window-level LLM feedback)
+    summaries = []
+    for w in abnormal_windows[:10]:  # Cap at 10 to avoid token overflow
+        wid = w.get("window_id", "?")
+        label = w.get("predicted_label", "Unknown")
+        cause = w.get("alert_cause", "None")
+        sev = w.get("severity", 0)
+        fb = w.get("feedback") or ""
+        fb_short = fb[:200] + "..." if len(fb) > 200 else fb
+        summaries.append(
+            f"  Window {wid}: {label}, cause={cause}, severity={sev:.2f}"
+            + (f" — \"{fb_short}\"" if fb_short else "")
+        )
+    window_summaries = "\n".join(summaries) or "  No abnormal windows"
+
+    # Temporal pattern: were issues early, middle, or late?
+    if abnormal_windows and total_windows > 1:
+        positions = [w.get("window_id", 0) / max(total_windows - 1, 1) for w in abnormal_windows]
+        avg_pos = sum(positions) / len(positions)
+        if avg_pos < 0.35:
+            temporal_pattern = "Issues concentrated in the first third of the session"
+        elif avg_pos > 0.65:
+            temporal_pattern = "Issues concentrated in the final third of the session"
+        else:
+            temporal_pattern = "Issues distributed throughout the session"
+    else:
+        temporal_pattern = "Insufficient data for temporal analysis"
 
     session_key = f"{road_tag}_s{session_id}"
 
@@ -203,7 +264,10 @@ def generate_session_feedback(
                 performance_score=performance_score,
                 total_windows=total_windows,
                 abnormal_count=abnormal_count,
-                top_causes=top_causes,
+                cause_distribution=cause_distribution,
+                severity_stats=severity_stats,
+                window_summaries=window_summaries,
+                temporal_pattern=temporal_pattern,
             )
         )
         return {

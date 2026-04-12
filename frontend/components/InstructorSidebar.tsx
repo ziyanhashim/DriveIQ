@@ -3,7 +3,7 @@ import {
   View, Text, TextInput, StyleSheet, Pressable, ScrollView, ActivityIndicator,
 } from "react-native";
 import { apiGet } from "../lib/api";
-import { fonts } from "../lib/theme";
+import { fonts, colors, radius, space } from "../lib/theme";
 
 type StudentStatus = "Active" | "Scheduled" | "Learner";
 
@@ -131,7 +131,7 @@ export default function InstructorSidebar() {
           </View>
 
           {loading ? (
-            <ActivityIndicator size="small" color="#7C3AED" style={{ marginTop: 16 }} />
+            <ActivityIndicator size="small" color={colors.blue} style={{ marginTop: 16 }} />
           ) : filtered.length === 0 ? (
             <Text style={styles.empty}>
               {learners.length === 0 ? "No students yet." : "No matches."}
@@ -161,7 +161,7 @@ export default function InstructorSidebar() {
           <Text style={styles.blockTitle}>Recent Sessions</Text>
 
           {loading ? (
-            <ActivityIndicator size="small" color="#7C3AED" style={{ marginTop: 12 }} />
+            <ActivityIndicator size="small" color={colors.blue} style={{ marginTop: 12 }} />
           ) : historyRows.length === 0 ? (
             <Text style={styles.empty}>No completed sessions yet.</Text>
           ) : (
@@ -194,61 +194,61 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: 24 },
 
   wrap: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.cardBg,
     borderWidth: 1,
-    borderColor: "#EAECF0",
-    borderRadius: 16,
-    padding: 14,
+    borderColor: colors.border,
+    borderRadius: radius.cardLg,
+    padding: space.card,
   },
-  sidebarTitle: { color: "#101828", fontFamily: fonts.extrabold, fontSize: 13, marginBottom: 10 },
+  sidebarTitle: { color: colors.textAlt, fontFamily: fonts.extrabold, fontSize: 13, marginBottom: 10 },
 
   block:      { marginTop: 12 },
-  blockTitle: { color: "#101828", fontFamily: fonts.extrabold, fontSize: 13 },
-  empty:      { marginTop: 12, fontSize: 12, fontFamily: fonts.bold, color: "#98A2B3" },
+  blockTitle: { color: colors.textAlt, fontFamily: fonts.extrabold, fontSize: 13 },
+  empty:      { marginTop: 12, fontSize: 12, fontFamily: fonts.bold, color: colors.muted },
 
   searchWrap: {
     marginTop: 10,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F9FAFB",
+    backgroundColor: colors.inputBg,
     borderWidth: 1,
-    borderColor: "#EAECF0",
-    borderRadius: 12,
+    borderColor: colors.border,
+    borderRadius: radius.input,
     paddingHorizontal: 10,
     paddingVertical: 10,
   },
   searchIcon:  { marginRight: 8, fontSize: 14 },
-  searchInput: { flex: 1, color: "#101828", fontSize: 13 },
+  searchInput: { flex: 1, color: colors.textAlt, fontSize: 13 },
 
   studentRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.cardBg,
     borderWidth: 1,
-    borderColor: "#EAECF0",
-    borderRadius: 14,
+    borderColor: colors.border,
+    borderRadius: radius.card,
     padding: 12,
     marginBottom: 10,
   },
-  avatar:        { width: 40, height: 40, borderRadius: 20, backgroundColor: "#EEF2FF", alignItems: "center", justifyContent: "center", marginRight: 10 },
-  avatarText:    { color: "#4F46E5", fontFamily: fonts.extrabold },
-  studentName:   { color: "#101828", fontFamily: fonts.extrabold, fontSize: 13 },
+  avatar:        { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.blueLight, alignItems: "center", justifyContent: "center", marginRight: 10 },
+  avatarText:    { color: colors.blue, fontFamily: fonts.extrabold },
+  studentName:   { color: colors.textAlt, fontFamily: fonts.extrabold, fontSize: 13 },
   dot:           { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
-  studentStatus: { color: "#667085", fontFamily: fonts.bold, fontSize: 12 },
+  studentStatus: { color: colors.subtextAlt, fontFamily: fonts.bold, fontSize: 12 },
 
   historyRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.cardBg,
     borderWidth: 1,
-    borderColor: "#EAECF0",
-    borderRadius: 14,
+    borderColor: colors.border,
+    borderRadius: radius.card,
     padding: 12,
     marginBottom: 10,
   },
-  historyName:   { color: "#101828", fontFamily: fonts.extrabold, fontSize: 13 },
-  historyTime:   { color: "#667085", fontFamily: fonts.bold, fontSize: 12, marginTop: 4 },
-  scorePill:     { minWidth: 44, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: "#EAECF0", backgroundColor: "#F9FAFB", alignItems: "center", justifyContent: "center" },
-  scorePillText: { color: "#101828", fontFamily: fonts.extrabold, fontSize: 12 },
-  noScore:       { color: "#98A2B3", fontFamily: fonts.bold, fontSize: 12 },
+  historyName:   { color: colors.textAlt, fontFamily: fonts.extrabold, fontSize: 13 },
+  historyTime:   { color: colors.subtextAlt, fontFamily: fonts.bold, fontSize: 12, marginTop: 4 },
+  scorePill:     { minWidth: 44, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.inputBg, alignItems: "center", justifyContent: "center" },
+  scorePillText: { color: colors.textAlt, fontFamily: fonts.extrabold, fontSize: 12 },
+  noScore:       { color: colors.muted, fontFamily: fonts.bold, fontSize: 12 },
 });

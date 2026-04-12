@@ -206,7 +206,7 @@ export default function Settings() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#6D28D9" />
+        <ActivityIndicator size="large" color={COLORS.blue} />
         <Text style={styles.centerText}>Loading settings…</Text>
       </View>
     );
@@ -256,7 +256,7 @@ export default function Settings() {
               <Text style={styles.fieldLabel}>Password</Text>
               <View style={styles.passwordRow}>
                 <View style={[styles.inputRow, { flex: 1 }]}>
-                  <TextInput value="••••••••••" editable={false} style={styles.input} placeholderTextColor="#9CA3AF" />
+                  <TextInput value="••••••••••" editable={false} style={styles.input} placeholderTextColor={COLORS.disabled} />
                 </View>
                 <Pressable style={styles.changePwdBtn} onPress={() => setPwdModalOpen(true)}>
                   <Ionicons name="lock-closed-outline" size={16} color={COLORS.text} />
@@ -341,27 +341,27 @@ export default function Settings() {
           <View style={styles.supportGrid}>
             <SupportTile icon="chatbox-ellipses-outline" iconColor={COLORS.blue}  title="Contact Support" sub="Get help from our team"    onPress={() => Alert.alert("Support", "Open support chat/email (mock).")} />
             <SupportTile icon="document-text-outline"    iconColor={COLORS.green} title="FAQs"            sub="Find quick answers"         onPress={() => Alert.alert("FAQs", "Open FAQs screen (mock).")} />
-            <SupportTile icon="bug-outline"              iconColor="#EF4444"      title="Report a Bug"    sub="Help us improve"            onPress={() => Alert.alert("Bug Report", "Open bug report form (mock).")} />
+            <SupportTile icon="bug-outline"              iconColor={COLORS.red}   title="Report a Bug"    sub="Help us improve"            onPress={() => Alert.alert("Bug Report", "Open bug report form (mock).")} />
           </View>
 
           <Pressable
-            style={[styles.logoutBtn, { backgroundColor: "#DC2626" }]}
+            style={[styles.logoutBtn, { backgroundColor: COLORS.redDark }]}
             onPress={() => {
-              const ok = window?.confirm?.("This will remove recent session data. Are you sure?") ?? true;
+              const ok = window?.confirm?.("This will clear all demo sessions, bookings, and availability slots. Are you sure?") ?? true;
               if (!ok) return;
               apiDelete("/sessions/clear-demo").then(() => {
-                Alert.alert("Done", "Session history cleared.");
+                Alert.alert("Done", "Sessions, bookings, and slots cleared.");
               }).catch(() => {
-                Alert.alert("Error", "Failed to clear session history.");
+                Alert.alert("Error", "Failed to clear demo data.");
               });
             }}
           >
-            <Ionicons name="trash-outline" size={18} color="#FFFFFF" />
-            <Text style={styles.logoutText}>Clear Session History</Text>
+            <Ionicons name="trash-outline" size={18} color={COLORS.cardBg} />
+            <Text style={styles.logoutText}>Clear Demo Data</Text>
           </Pressable>
 
           <Pressable style={styles.logoutBtn} onPress={handleLogout}>
-            <Ionicons name="log-out-outline" size={18} color="#FFFFFF" />
+            <Ionicons name="log-out-outline" size={18} color={COLORS.cardBg} />
             <Text style={styles.logoutText}>Log Out</Text>
           </Pressable>
         </View>
@@ -397,7 +397,7 @@ export default function Settings() {
                 value={currentPassword}
                 onChangeText={setCurrentPassword}
                 placeholder="Enter your current password"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={COLORS.disabled}
                 secureTextEntry={!showCurrent}
                 style={styles.modalInput}
               />
@@ -414,7 +414,7 @@ export default function Settings() {
                 value={newPassword}
                 onChangeText={setNewPassword}
                 placeholder="Min 6 characters"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={COLORS.disabled}
                 secureTextEntry={!showNew}
                 style={styles.modalInput}
               />
@@ -435,7 +435,7 @@ export default function Settings() {
                 value={confirmNewPwd}
                 onChangeText={setConfirmNewPwd}
                 placeholder="Repeat new password"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={COLORS.disabled}
                 secureTextEntry={!showConfirm}
                 style={styles.modalInput}
               />
@@ -495,7 +495,7 @@ function Field({ label, value, onChangeText, icon }: { label: string; value: str
       <Text style={styles.fieldLabel}>{label}</Text>
       <View style={styles.inputRow}>
         {icon ? <Ionicons name={icon} size={16} color={COLORS.muted} style={{ marginRight: 10 }} /> : null}
-        <TextInput value={value} onChangeText={onChangeText} style={styles.input} placeholderTextColor="#9CA3AF" />
+        <TextInput value={value} onChangeText={onChangeText} style={styles.input} placeholderTextColor={COLORS.disabled} />
       </View>
     </View>
   );
@@ -511,7 +511,7 @@ function ToggleRow({ icon, label, sub, value, onValueChange }: { icon?: keyof ty
         </View>
         {sub ? <Text style={styles.toggleSub}>{sub}</Text> : null}
       </View>
-      <Switch value={value} onValueChange={onValueChange} trackColor={{ false: "#D1D5DB", true: "#111827" }} thumbColor={Platform.OS === "android" ? "#FFFFFF" : undefined} />
+      <Switch value={value} onValueChange={onValueChange} trackColor={{ false: "#D0D5DD", true: COLORS.blue }} thumbColor={Platform.OS === "android" ? "#FFFFFF" : undefined} />
     </View>
   );
 }
@@ -545,25 +545,25 @@ const styles = StyleSheet.create({
   pageContent: { padding: 16, paddingBottom: 28, gap: 14 },
 
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
-  centerText: { marginTop: 12, fontSize: 13, fontFamily: fonts.extrabold, color: "#64748B" },
+  centerText: { marginTop: 12, fontSize: 13, fontFamily: fonts.extrabold, color: COLORS.subtext },
 
   headerRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   pageTitle: { fontSize: 18, fontFamily: fonts.extrabold, color: COLORS.text },
   pageSubtitle: { marginTop: 4, color: COLORS.subtext, fontFamily: fonts.semibold, fontSize: 12 },
 
-  card: { backgroundColor: COLORS.cardBg, borderWidth: 1, borderColor: COLORS.border, borderRadius: 14, padding: 14 },
+  card: { backgroundColor: COLORS.cardBg, borderWidth: 1, borderColor: COLORS.border, borderRadius: radius.card, padding: 14 },
 
   sectionTitleRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 },
   sectionTitle: { fontSize: 13, fontFamily: fonts.extrabold, color: COLORS.text },
 
   accountTopRow: { flexDirection: "row", gap: 14, alignItems: "center" },
   avatar: { width: 78, height: 78, borderRadius: 999, backgroundColor: "#6D67FF", alignItems: "center", justifyContent: "center" },
-  avatarText: { color: "#FFFFFF", fontSize: 26, fontFamily: fonts.extrabold },
+  avatarText: { color: COLORS.cardBg, fontSize: 26, fontFamily: fonts.extrabold },
 
   smallLabel: { color: COLORS.text, fontFamily: fonts.extrabold, fontSize: 12, marginBottom: 8 },
   helperText: { marginTop: 8, color: COLORS.subtext, fontFamily: fonts.bold, fontSize: 11 },
 
-  outlineBtn: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderColor: COLORS.border, backgroundColor: "#FFFFFF", paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10 },
+  outlineBtn: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.cardBg, paddingHorizontal: 12, paddingVertical: 10, borderRadius: radius.md },
   outlineBtnText: { color: COLORS.text, fontFamily: fonts.extrabold, fontSize: 12 },
 
   divider: { height: 1, backgroundColor: COLORS.border, marginVertical: 14 },
@@ -572,15 +572,15 @@ const styles = StyleSheet.create({
   fieldWrap: { flexGrow: 1, flexBasis: "48%", minWidth: 220 },
   fieldLabel: { color: COLORS.text, fontFamily: fonts.extrabold, fontSize: 12, marginBottom: 8 },
 
-  inputRow: { flexDirection: "row", alignItems: "center", backgroundColor: COLORS.inputBg, borderWidth: 1, borderColor: "#EEF0F6", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 },
+  inputRow: { flexDirection: "row", alignItems: "center", backgroundColor: COLORS.inputBg, borderWidth: 1, borderColor: COLORS.borderAlt, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 10 },
   input: { flex: 1, color: COLORS.text, fontFamily: fonts.extrabold, fontSize: 12, padding: 0 },
 
   passwordRow: { flexDirection: "row", gap: 10, alignItems: "center" },
-  changePwdBtn: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderColor: COLORS.border, backgroundColor: "#FFFFFF", paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10 },
+  changePwdBtn: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.cardBg, paddingHorizontal: 12, paddingVertical: 10, borderRadius: radius.md },
   changePwdText: { color: COLORS.text, fontFamily: fonts.extrabold, fontSize: 12 },
 
-  primaryBtn: { backgroundColor: COLORS.darkBtn, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12, minWidth: 120, alignItems: "center" },
-  primaryBtnText: { color: "#FFFFFF", fontFamily: fonts.extrabold, fontSize: 12 },
+  primaryBtn: { backgroundColor: COLORS.blue, borderRadius: radius.md, paddingHorizontal: 16, paddingVertical: 12, minWidth: 120, alignItems: "center" },
+  primaryBtnText: { color: COLORS.cardBg, fontFamily: fonts.extrabold, fontSize: 12 },
 
   groupTitle: { color: COLORS.text, fontFamily: fonts.extrabold, fontSize: 12, marginBottom: 10 },
 
@@ -589,7 +589,7 @@ const styles = StyleSheet.create({
   toggleSub: { marginTop: 6, color: COLORS.subtext, fontFamily: fonts.bold, fontSize: 11, lineHeight: 16 },
 
   twoColRow: { flexDirection: "row", gap: 12, flexWrap: "wrap" },
-  pickerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: COLORS.inputBg, borderWidth: 1, borderColor: "#EEF0F6", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 12 },
+  pickerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: COLORS.inputBg, borderWidth: 1, borderColor: COLORS.borderAlt, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 12 },
   pickerValue: { color: COLORS.text, fontFamily: fonts.extrabold, fontSize: 12 },
 
   downloadRow: { flexDirection: "row", alignItems: "center", gap: 12 },
@@ -597,40 +597,40 @@ const styles = StyleSheet.create({
   downloadSub: { marginTop: 6, color: COLORS.subtext, fontFamily: fonts.bold, fontSize: 11, lineHeight: 16 },
 
   supportGrid: { flexDirection: "column", gap: 12 },
-  supportTile: { width: "100%", borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, paddingVertical: 22, paddingHorizontal: 14, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", gap: 8 },
+  supportTile: { width: "100%", borderWidth: 1, borderColor: COLORS.border, borderRadius: radius.icon, paddingVertical: 22, paddingHorizontal: 14, backgroundColor: COLORS.cardBg, alignItems: "center", justifyContent: "center", gap: 8 },
   supportTitle: { color: COLORS.text, fontFamily: fonts.extrabold, fontSize: 12, textAlign: "center" },
   supportSub: { color: COLORS.subtext, fontFamily: fonts.bold, fontSize: 11, textAlign: "center" },
 
-  logoutBtn: { marginTop: 14, backgroundColor: "#0B1020", paddingVertical: 14, borderRadius: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
-  logoutText: { color: "#FFFFFF", fontFamily: fonts.extrabold, fontSize: 12 },
+  logoutBtn: { marginTop: 14, backgroundColor: COLORS.blue, paddingVertical: 14, borderRadius: radius.icon, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  logoutText: { color: COLORS.cardBg, fontFamily: fonts.extrabold, fontSize: 12 },
 
   // Modal
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "center", alignItems: "center", padding: 20 },
   modalCard: {
-    width: "100%", maxWidth: 420, backgroundColor: "#FFFFFF",
-    borderRadius: 16, padding: 20,
+    width: "100%", maxWidth: 420, backgroundColor: COLORS.cardBg,
+    borderRadius: radius.cardXl, padding: 20,
     ...Platform.select({
       ios: { shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 20, shadowOffset: { width: 0, height: 8 } },
       android: { elevation: 12 },
     }),
   },
   modalHeader: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 4 },
-  modalIconWrap: { width: 38, height: 38, borderRadius: 10, backgroundColor: "#EEF5FF", alignItems: "center", justifyContent: "center" },
+  modalIconWrap: { width: 38, height: 38, borderRadius: radius.md, backgroundColor: COLORS.blueLight, alignItems: "center", justifyContent: "center" },
   modalTitle: { fontSize: 15, fontFamily: fonts.extrabold, color: COLORS.text },
   modalSub: { fontSize: 12, fontFamily: fonts.bold, color: COLORS.subtext, marginTop: 2 },
   modalClose: { padding: 4 },
 
   modalLabel: { fontSize: 12, fontFamily: fonts.extrabold, color: COLORS.text, marginBottom: 8 },
-  modalInputRow: { flexDirection: "row", alignItems: "center", backgroundColor: COLORS.inputBg, borderWidth: 1, borderColor: "#EEF0F6", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 12 },
+  modalInputRow: { flexDirection: "row", alignItems: "center", backgroundColor: COLORS.inputBg, borderWidth: 1, borderColor: COLORS.borderAlt, borderRadius: radius.md, paddingHorizontal: 12, paddingVertical: 12 },
   modalInput: { flex: 1, color: COLORS.text, fontFamily: fonts.extrabold, fontSize: 13, padding: 0 },
 
-  modalError: { marginTop: 6, color: "#DC2626", fontFamily: fonts.bold, fontSize: 11 },
+  modalError: { marginTop: 6, color: COLORS.redDark, fontFamily: fonts.bold, fontSize: 11 },
   modalSuccessRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 10 },
   modalSuccess: { color: COLORS.green, fontFamily: fonts.bold, fontSize: 12 },
 
   modalBtns: { flexDirection: "row", gap: 10, marginTop: 20 },
-  modalCancelBtn: { flex: 1, borderWidth: 1, borderColor: COLORS.border, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
+  modalCancelBtn: { flex: 1, borderWidth: 1, borderColor: COLORS.border, borderRadius: radius.md, paddingVertical: 12, alignItems: "center" },
   modalCancelText: { color: COLORS.text, fontFamily: fonts.extrabold, fontSize: 13 },
-  modalSaveBtn: { flex: 1, backgroundColor: COLORS.darkBtn, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
-  modalSaveText: { color: "#FFFFFF", fontFamily: fonts.extrabold, fontSize: 13 },
+  modalSaveBtn: { flex: 1, backgroundColor: COLORS.blue, borderRadius: radius.md, paddingVertical: 12, alignItems: "center" },
+  modalSaveText: { color: COLORS.cardBg, fontFamily: fonts.extrabold, fontSize: 13 },
 });

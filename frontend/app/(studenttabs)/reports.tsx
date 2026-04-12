@@ -11,7 +11,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { apiGet } from "../../lib/api";
-import { colors, fonts, page, space } from "../../lib/theme";
+import { colors, fonts, radius, page, space } from "../../lib/theme";
 import FadeInView from "../../components/FadeInView";
 import AnimatedPressable from "../../components/AnimatedPressable";
 import MetricCard from "../../components/MetricCard";
@@ -109,7 +109,7 @@ export default function ReportsListScreen() {
   if (loading) {
     return (
       <View style={page.center}>
-        <ActivityIndicator size="large" color={colors.purpleDark} />
+        <ActivityIndicator size="large" color={colors.blue} />
         <Text style={page.centerText}>Loading reports…</Text>
       </View>
     );
@@ -135,7 +135,7 @@ export default function ReportsListScreen() {
         contentContainerStyle={[page.content, { paddingTop: 16 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.purpleDark} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.blue} />
         }
       >
         {/* Header */}
@@ -276,7 +276,7 @@ const ls = StyleSheet.create({
   loadMoreBtn: {
     alignItems: "center",
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: radius.card,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.cardBg,
@@ -290,12 +290,12 @@ const ls = StyleSheet.create({
     marginTop: 16,
     paddingHorizontal: 24,
     paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: colors.purpleDark,
+    borderRadius: radius.md,
+    backgroundColor: colors.blue,
   },
   retryBtnText: {
     fontSize: 14,
-    color: "#FFFFFF",
+    color: colors.cardBg,
     fontFamily: fonts.bold,
   },
 });

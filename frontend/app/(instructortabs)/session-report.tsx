@@ -34,7 +34,7 @@ import ScoreRing from "../../components/ScoreRing";
 import BehaviorBar from "../../components/BehaviorBar";
 import FilterChips, { ChipOption } from "../../components/FilterChips";
 import MetricCard from "../../components/MetricCard";
-import RecommendationQueue, { Recommendation } from "../../components/RecommendationQueue";
+import RouteMapModal from "../../components/RouteMapModal";
 
 // ─── Enable LayoutAnimation on Android ──────────────────────────────────────
 
@@ -82,7 +82,9 @@ type SessionReport = {
   date?: string;
   instructor?: string;
   instructor_notes?: string;
+  instructor_feedback?: string;
   report_ready?: boolean;
+  has_route?: boolean;
   ai_feedback?: { priority: string; title: string; message: string; icon: string }[];
 };
 
@@ -96,7 +98,7 @@ const LABEL_COLORS = {
   Normal: {
     bg: colors.greenLight,
     border: colors.greenBorder,
-    text: colors.greenDark ?? "#166534",
+    text: colors.greenDark,
     dot: colors.green,
     icon: "checkmark-circle" as const,
   },
@@ -248,7 +250,7 @@ function FeedbackPanel({ window: w }: { window: WindowData }) {
       {w.feedback ? (
         <View style={s.llmFeedback}>
           <View style={s.llmFeedbackHeader}>
-            <Ionicons name="sparkles" size={16} color={colors.purpleDark} />
+            <Ionicons name="sparkles" size={16} color={colors.blue} />
             <Text style={s.llmFeedbackTitle}>AI Feedback</Text>
           </View>
           <Text style={s.llmFeedbackText}>{w.feedback}</Text>
@@ -256,7 +258,7 @@ function FeedbackPanel({ window: w }: { window: WindowData }) {
       ) : (
         <View style={[s.llmFeedback, { backgroundColor: colors.borderLight }]}>
           <Text style={[s.llmFeedbackText, { color: colors.subtext, fontStyle: "italic" }]}>
-            Feedback not yet generated for this window.
+            No issues detected — driving was within normal parameters.
           </Text>
         </View>
       )}
@@ -280,6 +282,7 @@ export default function SessionReportScreen() {
   const [filter, setFilter] = useState<FilterMode>("All");
   const [timelinePage, setTimelinePage] = useState(0);
   const [notesExpanded, setNotesExpanded] = useState(false);
+  const [showRouteMap, setShowRouteMap] = useState(false);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -300,7 +303,7 @@ export default function SessionReportScreen() {
         apiGet(`/sessions/${sessionId}/report`),
       ]);
 
-      const reportReady: boolean = true;
+      const reportReady = !!(reportData?.overall_score?.score || reportData?.analysis);
 
       const merged: SessionReport = {
         session_id: sessionId ?? "",
@@ -313,8 +316,11 @@ export default function SessionReportScreen() {
         windows: timelineData.windows ?? [],
         date: reportData.session_summary?.date,
         instructor: reportData.session_summary?.instructor,
+        summary_feedback: reportData.summary_feedback ?? "",
         instructor_notes: reportData.instructor_notes ?? "",
+        instructor_feedback: reportData.instructor_feedback ?? "",
         report_ready: reportReady,
+        has_route: reportData.has_route ?? false,
         ai_feedback: reportData.ai_feedback,
       };
 
@@ -390,19 +396,6 @@ export default function SessionReportScreen() {
     ];
   }, [report]);
 
-  // ── AI feedback as recommendations ─────────────────────────────────────
-
-  const recommendations: Recommendation[] = useMemo(() => {
-    if (!report?.ai_feedback) return [];
-    return report.ai_feedback.map((f, i) => ({
-      id: `ai-${i}`,
-      icon: f.icon || "💡",
-      title: f.title,
-      message: f.message,
-      priority: (f.priority as "high" | "medium" | "low") ?? "medium",
-    }));
-  }, [report]);
-
   // ── Navigation ─────────────────────────────────────────────────────────
 
   function jumpToNext() {
@@ -434,7 +427,7 @@ export default function SessionReportScreen() {
   if (loading) {
     return (
       <View style={page.center}>
-        <ActivityIndicator size="large" color={colors.purpleDark} />
+        <ActivityIndicator size="large" color={colors.blue} />
         <Text style={page.centerText}>Loading report…</Text>
       </View>
     );
@@ -470,7 +463,7 @@ export default function SessionReportScreen() {
             <Text style={s.pendingText}>
               Your instructor is reviewing this session. The full report will appear here automatically once generated.
             </Text>
-            <ActivityIndicator size="small" color={colors.purpleDark} style={{ marginTop: 16 }} />
+            <ActivityIndicator size="small" color={colors.blue} style={{ marginTop: 16 }} />
           </View>
         </ScrollView>
       </View>
@@ -507,6 +500,17 @@ export default function SessionReportScreen() {
           </View>
         </View>
 
+        {/* ── Route Map Button ───────────────────────────────────────── */}
+        {report.has_route && (
+          <Pressable
+            onPress={() => setShowRouteMap(true)}
+            style={({ pressed }) => [s.routeBtn, pressed && { opacity: 0.8 }]}
+          >
+            <Text style={s.routeBtnIcon}>📍</Text>
+            <Text style={s.routeBtnText}>View Route Map</Text>
+          </Pressable>
+        )}
+
         {/* ── 2. Behavior Breakdown ────────────────────────────────────── */}
         <View style={card.base}>
           <SectionHeader icon="📈" iconBg={colors.greenBorderAlt} label="Behavior Breakdown" />
@@ -524,7 +528,7 @@ export default function SessionReportScreen() {
         <View style={card.base}>
           <SectionHeader
             icon="📊"
-            iconBg={colors.blueLighter ?? "#DBEAFE"}
+            iconBg={colors.blueLighter}
             label="Window Timeline"
             right={
               abnormalWindows.length > 0 ? (
@@ -624,36 +628,28 @@ export default function SessionReportScreen() {
           </View>
         )}
 
-        {/* ── 5. AI Feedback ───────────────────────────────────────────── */}
-        {recommendations.length > 0 && (
-          <View style={card.base}>
-            <SectionHeader icon="💡" iconBg={tint.amber.bg} label="AI Recommendations" />
-            <RecommendationQueue items={recommendations} maxVisible={3} />
-          </View>
-        )}
-
-        {/* ── 6. Session Summary (LLM) ─────────────────────────────────── */}
+        {/* ── 5. Session Summary (LLM) ─────────────────────────────────── */}
         {report.summary_feedback && (
           <View style={card.base}>
-            <SectionHeader icon="🧠" iconBg={colors.purpleLighter ?? "#F4EFFF"} label="Session Summary" />
+            <SectionHeader icon="🧠" iconBg={colors.blueLighter} label="Session Summary" />
             <View style={s.summaryBox}>
-              <Ionicons name="sparkles" size={18} color={colors.purpleDark} />
+              <Ionicons name="sparkles" size={18} color={colors.blue} />
               <Text style={s.summaryText}>{report.summary_feedback}</Text>
             </View>
           </View>
         )}
 
         {/* ── 7. Instructor Notes ──────────────────────────────────────── */}
-        {!!report.instructor_notes?.trim() && (
+        {!!(report.instructor_notes?.trim() || report.instructor_feedback?.trim()) && (
           <View style={[card.base, s.instructorNotesCard]}>
             <SectionHeader icon="📝" iconBg={tint.orange.bg} label="Instructor Notes" />
             <Text
               style={s.instructorNotesText}
               numberOfLines={notesExpanded ? undefined : 3}
             >
-              "{report.instructor_notes.trim()}"
+              "{(report.instructor_notes?.trim() || report.instructor_feedback?.trim())}"
             </Text>
-            {report.instructor_notes.trim().length > 150 && (
+            {(report.instructor_notes?.trim() || report.instructor_feedback?.trim() || "").length > 150 && (
               <Pressable onPress={() => setNotesExpanded(!notesExpanded)}>
                 <Text style={s.readMoreText}>{notesExpanded ? "Show less" : "Read more"}</Text>
               </Pressable>
@@ -666,6 +662,13 @@ export default function SessionReportScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      <RouteMapModal
+        visible={showRouteMap}
+        onClose={() => setShowRouteMap(false)}
+        sessionId={sessionId ?? ""}
+        windows={report?.windows}
+      />
     </View>
   );
 }
@@ -675,6 +678,20 @@ export default function SessionReportScreen() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const s = StyleSheet.create({
+  // ── Route button
+  routeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: colors.darkBg,
+    borderRadius: radius.card,
+    paddingVertical: 12,
+    paddingHorizontal: space.lg,
+  },
+  routeBtnIcon: { fontSize: 16 },
+  routeBtnText: { fontSize: 13, fontFamily: fonts.extrabold, color: "#FFFFFF" },
+
   // ── Back button
   backBtn: {
     flexDirection: "row",
@@ -743,7 +760,7 @@ const s = StyleSheet.create({
   windowBlock: {
     width: 44,
     height: 44,
-    borderRadius: 10,
+    borderRadius: radius.md,
     borderWidth: 1.5,
     alignItems: "center",
     justifyContent: "center",
@@ -837,7 +854,7 @@ const s = StyleSheet.create({
   severityBadge: {
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: radius.icon,
   },
   severityText: {
     fontSize: 11,
@@ -852,7 +869,7 @@ const s = StyleSheet.create({
     backgroundColor: colors.amberBg,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 8,
+    borderRadius: radius.sm,
     marginBottom: 12,
   },
   alertCauseText: {
@@ -883,7 +900,7 @@ const s = StyleSheet.create({
     minWidth: 130,
     maxWidth: 220,
     backgroundColor: colors.pageBg,
-    borderRadius: 10,
+    borderRadius: radius.md,
     padding: space.card,
     borderWidth: 1,
     borderColor: colors.borderLight,
@@ -907,8 +924,8 @@ const s = StyleSheet.create({
 
   // ── LLM Feedback
   llmFeedback: {
-    backgroundColor: colors.purpleLight,
-    borderRadius: 10,
+    backgroundColor: colors.blueLight,
+    borderRadius: radius.md,
     padding: 14,
   },
   llmFeedbackHeader: {
@@ -920,7 +937,7 @@ const s = StyleSheet.create({
   llmFeedbackTitle: {
     fontSize: 13,
     fontFamily: fonts.bold,
-    color: colors.purpleDark,
+    color: colors.blue,
   },
   llmFeedbackText: {
     fontSize: 13.5,
@@ -947,8 +964,8 @@ const s = StyleSheet.create({
   summaryBox: {
     flexDirection: "row",
     gap: 10,
-    backgroundColor: colors.purpleLight,
-    borderRadius: 10,
+    backgroundColor: colors.blueLight,
+    borderRadius: radius.md,
     padding: 14,
     alignItems: "flex-start",
   },
@@ -965,8 +982,8 @@ const s = StyleSheet.create({
     marginTop: 16,
     paddingHorizontal: 24,
     paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: colors.purpleDark,
+    borderRadius: radius.md,
+    backgroundColor: colors.blue,
   },
   retryBtnText: {
     fontSize: 14,

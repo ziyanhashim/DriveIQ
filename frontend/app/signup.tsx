@@ -6,11 +6,13 @@ import {
   TextInput,
   Pressable,
   StyleSheet,
-  Platform,
   Alert,
   ScrollView,
   ActivityIndicator,
+  Image,
+  useWindowDimensions,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 
 import { apiPost } from "../lib/api";
@@ -36,6 +38,9 @@ function isValidEmail(input: string) {
 }
 
 export default function SignupScreen() {
+  const { width } = useWindowDimensions();
+  const isWide = width >= 700;
+
   const [role, setRole] = useState<Role>("student");
   const [loading, setLoading] = useState(false);
 
@@ -135,342 +140,359 @@ export default function SignupScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
-        <View style={styles.logoWrap}>
-          <View style={styles.logoCircle}>
-            <Text style={styles.logoText}>DI</Text>
-          </View>
-        </View>
+    <SafeAreaView style={s.safe}>
+      <LinearGradient
+        colors={["#0B6A5D", "#0D1B35", "#12324D"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={s.bg}
+      >
+        <View style={s.bgGlowTop} />
+        <View style={s.bgGlowBottom} />
 
-        <Text style={styles.h1}>Create Account</Text>
-        <Text style={styles.h2}>Sign up to start using DriveIQ</Text>
+        <ScrollView
+          contentContainerStyle={s.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={[s.shell, isWide && s.shellWide]}>
+            {/* Logo */}
+            <View style={s.logoWrap}>
+              <Image source={require("../assets/drive-iq-logo-darkblue.png")} style={s.logoImg} />
+              <Text style={s.logoLabel}>DriveIQ</Text>
+            </View>
 
-        <View style={styles.card}>
-          <Text style={styles.roleLabel}>Choose Role</Text>
+            <Text style={s.h1}>Create Account</Text>
+            <Text style={s.subtitle}>Sign up to start using DriveIQ</Text>
 
-          <View style={styles.rolePills}>
-            <Pressable
-              onPress={() => setRole("student")}
-              style={[styles.rolePill, role === "student" && styles.rolePillActive]}
-            >
-              <Text style={[styles.rolePillText, role === "student" && styles.rolePillTextActive]}>
-                Student
-              </Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() => setRole("instructor")}
-              style={[styles.rolePill, role === "instructor" && styles.rolePillActive]}
-            >
-              <Text
-                style={[
-                  styles.rolePillText,
-                  role === "instructor" && styles.rolePillTextActive,
-                ]}
+            {/* Role selector */}
+            <Text style={[s.label, { marginTop: 24 }]}>Choose Role</Text>
+            <View style={s.rolePills}>
+              <Pressable
+                onPress={() => setRole("student")}
+                style={[s.rolePill, role === "student" && s.rolePillActive]}
               >
-                Instructor
-              </Text>
-            </Pressable>
-          </View>
+                {role === "student" ? (
+                  <LinearGradient
+                    colors={["#0A8A7A", "#07705F"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={s.rolePillGradient}
+                  >
+                    <Text style={s.rolePillTextActive}>Student</Text>
+                  </LinearGradient>
+                ) : (
+                  <Text style={s.rolePillText}>Student</Text>
+                )}
+              </Pressable>
 
-          {role === "student" ? (
-            <>
-              <Text style={styles.label}>Full Name</Text>
-              <View style={[styles.inputWrap, touched.name && name.trim().length < 2 && styles.inputError]}>
-                <Text style={styles.inputIcon}>👤</Text>
-                <TextInput
-                  value={name}
-                  onChangeText={setName}
-                  onBlur={() => touch("name")}
-                  placeholder="Enter your full name"
-                  placeholderTextColor="#98A2B3"
-                  style={styles.input}
-                />
-                {touched.name && (name.trim().length >= 2 ? <Text style={styles.checkIcon}>✓</Text> : <Text style={styles.crossIcon}>✗</Text>)}
-              </View>
+              <Pressable
+                onPress={() => setRole("instructor")}
+                style={[s.rolePill, role === "instructor" && s.rolePillActive]}
+              >
+                {role === "instructor" ? (
+                  <LinearGradient
+                    colors={["#0A8A7A", "#07705F"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={s.rolePillGradient}
+                  >
+                    <Text style={s.rolePillTextActive}>Instructor</Text>
+                  </LinearGradient>
+                ) : (
+                  <Text style={s.rolePillText}>Instructor</Text>
+                )}
+              </Pressable>
+            </View>
 
-              <Text style={[styles.label, { marginTop: 12 }]}>Email</Text>
-              <View style={[styles.inputWrap, touched.studentEmail && !studentEmailOk && styles.inputError]}>
-                <Text style={styles.inputIcon}>✉️</Text>
-                <TextInput
-                  value={studentEmail}
-                  onChangeText={setStudentEmail}
-                  onBlur={() => touch("studentEmail")}
-                  placeholder="Enter your email"
-                  placeholderTextColor="#98A2B3"
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                  style={styles.input}
-                />
-                {touched.studentEmail && (studentEmailOk ? <Text style={styles.checkIcon}>✓</Text> : <Text style={styles.crossIcon}>✗</Text>)}
-              </View>
+            {/* Fields */}
+            {role === "student" ? (
+              <>
+                <Text style={s.label}>Full Name</Text>
+                <View style={[s.inputWrap, touched.name && name.trim().length < 2 && s.inputError]}>
+                  <TextInput
+                    value={name}
+                    onChangeText={setName}
+                    onBlur={() => touch("name")}
+                    placeholder="Enter your full name"
+                    placeholderTextColor="#94A3B8"
+                    style={s.input}
+                  />
+                  {touched.name && (name.trim().length >= 2 ? <Text style={s.checkIcon}>✓</Text> : <Text style={s.crossIcon}>✗</Text>)}
+                </View>
 
-              <Text style={[styles.label, { marginTop: 12 }]}>Mobile Number</Text>
-              <View style={[styles.inputWrap, touched.mobile && !studentMobileOk && styles.inputError]}>
-                <Text style={styles.inputIcon}>📱</Text>
-                <TextInput
-                  value={mobile}
-                  onChangeText={setMobile}
-                  onBlur={() => touch("mobile")}
-                  placeholder="Enter your mobile number (e.g. +971501234567)"
-                  placeholderTextColor="#98A2B3"
-                  keyboardType="phone-pad"
-                  style={styles.input}
-                />
-                {touched.mobile && (studentMobileOk ? <Text style={styles.checkIcon}>✓</Text> : <Text style={styles.crossIcon}>✗</Text>)}
-              </View>
-            </>
-          ) : (
-            <>
-              <Text style={styles.label}>Instructor Email</Text>
-              <View style={[styles.inputWrap, touched.email && !instructorEmailOk && styles.inputError]}>
-                <Text style={styles.inputIcon}>✉️</Text>
-                <TextInput
-                  value={email}
-                  onChangeText={setEmail}
-                  onBlur={() => touch("email")}
-                  placeholder="Enter instructor email"
-                  placeholderTextColor="#98A2B3"
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                  style={styles.input}
-                />
-                {touched.email && (instructorEmailOk ? <Text style={styles.checkIcon}>✓</Text> : <Text style={styles.crossIcon}>✗</Text>)}
-              </View>
+                <Text style={[s.label, s.labelSpacing]}>Email</Text>
+                <View style={[s.inputWrap, touched.studentEmail && !studentEmailOk && s.inputError]}>
+                  <TextInput
+                    value={studentEmail}
+                    onChangeText={setStudentEmail}
+                    onBlur={() => touch("studentEmail")}
+                    placeholder="Enter your email"
+                    placeholderTextColor="#94A3B8"
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                    style={s.input}
+                  />
+                  {touched.studentEmail && (studentEmailOk ? <Text style={s.checkIcon}>✓</Text> : <Text style={s.crossIcon}>✗</Text>)}
+                </View>
 
-              <Text style={[styles.label, { marginTop: 12 }]}>Instructor Code</Text>
-              <View style={[styles.inputWrap, touched.instructorCode && !instructorCodeOk && styles.inputError]}>
-                <Text style={styles.inputIcon}>🔑</Text>
-                <TextInput
-                  value={instructorCode}
-                  onChangeText={setInstructorCode}
-                  onBlur={() => touch("instructorCode")}
-                  placeholder="Enter the code provided by the company"
-                  placeholderTextColor="#98A2B3"
-                  autoCapitalize="characters"
-                  style={styles.input}
-                />
-                {touched.instructorCode && (instructorCodeOk ? <Text style={styles.checkIcon}>✓</Text> : <Text style={styles.crossIcon}>✗</Text>)}
-              </View>
-            </>
-          )}
-
-          <Text style={[styles.label, { marginTop: 12 }]}>Password</Text>
-          <View style={[styles.inputWrap, touched.password && !passwordLengthOk && styles.inputError]}>
-            <Text style={styles.inputIcon}>🔒</Text>
-            <TextInput
-              value={password}
-              onChangeText={setPassword}
-              onBlur={() => touch("password")}
-              placeholder="Create a password (min 6 chars)"
-              placeholderTextColor="#98A2B3"
-              secureTextEntry
-              style={styles.input}
-            />
-            {touched.password && (passwordLengthOk ? <Text style={styles.checkIcon}>✓</Text> : <Text style={styles.crossIcon}>✗</Text>)}
-          </View>
-
-          <Text style={[styles.label, { marginTop: 12 }]}>Confirm Password</Text>
-          <View style={[styles.inputWrap, touched.confirmPassword && !passwordsMatch && styles.inputError]}>
-            <Text style={styles.inputIcon}>🔒</Text>
-            <TextInput
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              onBlur={() => touch("confirmPassword")}
-              placeholder="Confirm password"
-              placeholderTextColor="#98A2B3"
-              secureTextEntry
-              style={styles.input}
-            />
-            {touched.confirmPassword && (passwordsMatch ? <Text style={styles.checkIcon}>✓</Text> : <Text style={styles.crossIcon}>✗</Text>)}
-          </View>
-
-          {confirmPassword.length > 0 && password !== confirmPassword && (
-            <Text style={styles.errorText}>Passwords do not match</Text>
-          )}
-
-          {/* Validation summary */}
-          <View style={styles.validationBox}>
-            <Text style={styles.validationTitle}>Requirements</Text>
-            {validationItems.map((item, i) => (
-              <View key={i} style={styles.validationRow}>
-                <Text style={item.ok ? styles.validationCheck : styles.validationCross}>
-                  {item.ok ? "✓" : "○"}
-                </Text>
-                <Text style={[styles.validationLabel, item.ok && styles.validationLabelDone]}>
-                  {item.label}
-                </Text>
-              </View>
-            ))}
-          </View>
-
-          <Pressable
-            onPress={onSignup}
-            disabled={loading}
-            style={({ pressed }) => [
-              styles.signupBtn,
-              !canSignup && styles.signupBtnDisabled,
-              pressed && { opacity: 0.85 },
-            ]}
-          >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
+                <Text style={[s.label, s.labelSpacing]}>Mobile Number</Text>
+                <View style={[s.inputWrap, touched.mobile && !studentMobileOk && s.inputError]}>
+                  <TextInput
+                    value={mobile}
+                    onChangeText={setMobile}
+                    onBlur={() => touch("mobile")}
+                    placeholder="e.g. +971501234567"
+                    placeholderTextColor="#94A3B8"
+                    keyboardType="phone-pad"
+                    style={s.input}
+                  />
+                  {touched.mobile && (studentMobileOk ? <Text style={s.checkIcon}>✓</Text> : <Text style={s.crossIcon}>✗</Text>)}
+                </View>
+              </>
             ) : (
-              <Text style={styles.signupBtnText}>
-                {role === "instructor" ? "Create Instructor Account" : "Create Account"}
-              </Text>
+              <>
+                <Text style={s.label}>Instructor Email</Text>
+                <View style={[s.inputWrap, touched.email && !instructorEmailOk && s.inputError]}>
+                  <TextInput
+                    value={email}
+                    onChangeText={setEmail}
+                    onBlur={() => touch("email")}
+                    placeholder="Enter instructor email"
+                    placeholderTextColor="#94A3B8"
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                    style={s.input}
+                  />
+                  {touched.email && (instructorEmailOk ? <Text style={s.checkIcon}>✓</Text> : <Text style={s.crossIcon}>✗</Text>)}
+                </View>
+
+                <Text style={[s.label, s.labelSpacing]}>Instructor Code</Text>
+                <View style={[s.inputWrap, touched.instructorCode && !instructorCodeOk && s.inputError]}>
+                  <TextInput
+                    value={instructorCode}
+                    onChangeText={setInstructorCode}
+                    onBlur={() => touch("instructorCode")}
+                    placeholder="Code provided by your company"
+                    placeholderTextColor="#94A3B8"
+                    autoCapitalize="characters"
+                    style={s.input}
+                  />
+                  {touched.instructorCode && (instructorCodeOk ? <Text style={s.checkIcon}>✓</Text> : <Text style={s.crossIcon}>✗</Text>)}
+                </View>
+              </>
             )}
-          </Pressable>
 
-          <Pressable onPress={() => router.back()} style={styles.linkBtn}>
-            <Text style={styles.linkText}>Already have an account? Log in</Text>
-          </Pressable>
-        </View>
+            <Text style={[s.label, s.labelSpacing]}>Password</Text>
+            <View style={[s.inputWrap, touched.password && !passwordLengthOk && s.inputError]}>
+              <TextInput
+                value={password}
+                onChangeText={setPassword}
+                onBlur={() => touch("password")}
+                placeholder="Create a password (min 6 chars)"
+                placeholderTextColor="#94A3B8"
+                secureTextEntry
+                style={s.input}
+              />
+              {touched.password && (passwordLengthOk ? <Text style={s.checkIcon}>✓</Text> : <Text style={s.crossIcon}>✗</Text>)}
+            </View>
 
-        <Text style={styles.footer}>© 2025 DriveIQ. All rights reserved.</Text>
-      </ScrollView>
+            <Text style={[s.label, s.labelSpacing]}>Confirm Password</Text>
+            <View style={[s.inputWrap, touched.confirmPassword && !passwordsMatch && s.inputError]}>
+              <TextInput
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                onBlur={() => touch("confirmPassword")}
+                placeholder="Confirm password"
+                placeholderTextColor="#94A3B8"
+                secureTextEntry
+                style={s.input}
+              />
+              {touched.confirmPassword && (passwordsMatch ? <Text style={s.checkIcon}>✓</Text> : <Text style={s.crossIcon}>✗</Text>)}
+            </View>
+
+            {confirmPassword.length > 0 && password !== confirmPassword && (
+              <Text style={s.errorText}>Passwords do not match</Text>
+            )}
+
+            {/* Validation summary */}
+            <View style={s.validationBox}>
+              <Text style={s.validationTitle}>Requirements</Text>
+              {validationItems.map((item, i) => (
+                <View key={i} style={s.validationRow}>
+                  <Text style={item.ok ? s.validationCheck : s.validationCross}>
+                    {item.ok ? "✓" : "○"}
+                  </Text>
+                  <Text style={[s.validationLabel, item.ok && s.validationLabelDone]}>
+                    {item.label}
+                  </Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Submit */}
+            <Pressable
+              onPress={onSignup}
+              disabled={loading}
+              style={[s.signupBtn, !canSignup && { opacity: 0.6 }]}
+            >
+              <LinearGradient
+                colors={canSignup ? ["#0A8A7A", "#07705F"] : ["#7C8AA5", "#667085"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={s.signupBtnFill}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={s.signupBtnText}>
+                    {role === "instructor" ? "Create Instructor Account" : "Create Account"}
+                  </Text>
+                )}
+              </LinearGradient>
+            </Pressable>
+
+            <Pressable onPress={() => router.back()} style={s.linkBtn}>
+              <Text style={s.linkPrefix}>Already have an account?</Text>
+              <Text style={s.linkText}>Log in</Text>
+            </Pressable>
+
+            <Text style={s.footer}>© 2025 DriveIQ. All rights reserved.</Text>
+          </View>
+        </ScrollView>
+      </LinearGradient>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#F5F7FB" },
-  page: {
-    paddingHorizontal: 18,
-    paddingTop: 24,
-    paddingBottom: 40,
-    alignItems: "center",
+const s = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: "#0D1B35" },
+  bg: { flex: 1 },
+  bgGlowTop: {
+    position: "absolute", top: -140, left: -80,
+    width: 340, height: 340, borderRadius: 999,
+    backgroundColor: "rgba(10,138,122,0.26)",
+  },
+  bgGlowBottom: {
+    position: "absolute", bottom: -140, right: -80,
+    width: 360, height: 360, borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.08)",
   },
 
-  logoWrap: { marginBottom: 10 },
-  logoCircle: {
-    width: 54,
-    height: 54,
-    borderRadius: 16,
-    backgroundColor: "#2563EB",
-    alignItems: "center",
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 20,
+    paddingVertical: 24,
     justifyContent: "center",
   },
-  logoText: { color: "#fff", fontSize: 18, fontWeight: "900" },
 
-  h1: { fontSize: 18, fontWeight: "800", color: "#101828" },
-  h2: {
-    fontSize: 13,
-    color: "#667085",
-    marginTop: 6,
-    marginBottom: 14,
-  },
-
-  card: {
+  shell: {
     width: "100%",
-    maxWidth: 420,
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#EAECF0",
-    ...Platform.select({
-      ios: {
-        shadowColor: "#101828",
-        shadowOpacity: 0.08,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: 6 },
-      },
-      android: { elevation: 2 },
-    }),
+    maxWidth: 480,
+    alignSelf: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 28,
+    padding: 28,
+    shadowColor: "#06101D",
+    shadowOpacity: 0.18,
+    shadowRadius: 28,
+    shadowOffset: { width: 0, height: 18 },
+    elevation: 10,
+  },
+  shellWide: {
+    padding: 40,
   },
 
-  roleLabel: {
-    color: "#344054",
-    fontSize: 12,
-    fontWeight: "800",
-    marginBottom: 8,
+  logoWrap: { flexDirection: "row", alignItems: "center", gap: 10, alignSelf: "flex-start", marginBottom: 20 },
+  logoImg: { width: 44, height: 44, resizeMode: "contain" },
+  logoLabel: { color: "#0D1B35", fontSize: 22, fontFamily: "Sora_700Bold", letterSpacing: -0.5 },
+
+  h1: {
+    fontSize: 26, lineHeight: 32,
+    color: "#0D1B35", fontFamily: "Sora_800ExtraBold",
+    letterSpacing: -0.8,
   },
-  rolePills: {
-    flexDirection: "row",
-    gap: 10,
-    marginBottom: 14,
+  subtitle: {
+    color: "#64748B", fontSize: 13, lineHeight: 20,
+    fontFamily: "Sora_400Regular", marginTop: 6,
   },
-  rolePill: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: "#D0D5DD",
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-  },
-  rolePillActive: {
-    backgroundColor: "#0B1220",
-    borderColor: "#0B1220",
-  },
-  rolePillText: { fontWeight: "900", fontSize: 12, color: "#101828" },
-  rolePillTextActive: { color: "#fff" },
 
   label: {
-    color: "#344054",
-    fontSize: 12,
-    fontWeight: "700",
-    marginBottom: 6,
+    color: "#0D1B35", fontSize: 12,
+    fontFamily: "Sora_600SemiBold",
+    letterSpacing: -0.1, marginBottom: 8,
+  },
+  labelSpacing: { marginTop: 14 },
+
+  rolePills: { flexDirection: "row", gap: 10, marginBottom: 18 },
+  rolePill: {
+    flex: 1, borderWidth: 1, borderColor: "#E8ECF0",
+    borderRadius: 14, overflow: "hidden",
+    backgroundColor: "#FFFFFF",
+  },
+  rolePillActive: { borderColor: "#0A8A7A" },
+  rolePillGradient: {
+    paddingVertical: 12, alignItems: "center",
+  },
+  rolePillText: {
+    fontFamily: "Sora_700Bold", fontSize: 13,
+    color: "#344054", textAlign: "center",
+    paddingVertical: 12,
+  },
+  rolePillTextActive: {
+    fontFamily: "Sora_700Bold", fontSize: 13, color: "#FFFFFF",
   },
 
   inputWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F9FAFB",
-    borderWidth: 1,
-    borderColor: "#EAECF0",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    flexDirection: "row", alignItems: "center",
+    backgroundColor: "#F4F6F8", borderWidth: 1,
+    borderColor: "#E8ECF0", borderRadius: 14,
+    paddingHorizontal: 16, paddingVertical: 13,
   },
   inputError: { borderColor: "#FCA5A5", backgroundColor: "#FFF5F5" },
-  inputIcon: { marginRight: 8 },
-  input: { flex: 1, color: "#101828", fontSize: 14 },
-  checkIcon: { color: "#16A34A", fontWeight: "900", fontSize: 14 },
-  crossIcon: { color: "#DC2626", fontWeight: "900", fontSize: 14 },
+  input: { flex: 1, color: "#0D1B35", fontSize: 14, fontFamily: "Sora_500Medium" },
+  checkIcon: { color: "#16A34A", fontFamily: "Sora_800ExtraBold", fontSize: 14, marginLeft: 8 },
+  crossIcon: { color: "#DC2626", fontFamily: "Sora_800ExtraBold", fontSize: 14, marginLeft: 8 },
 
   errorText: {
-    color: "#DC2626",
-    fontSize: 12,
-    marginTop: 8,
-    fontWeight: "700",
+    color: "#DC2626", fontSize: 12, marginTop: 8,
+    fontFamily: "Sora_600SemiBold",
   },
-
-  signupBtn: {
-    marginTop: 16,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
-    backgroundColor: "#0B1220",
-  },
-  signupBtnDisabled: { backgroundColor: "#6B7280" },
-  signupBtnText: { color: "#fff", fontWeight: "900", fontSize: 14 },
 
   validationBox: {
-    marginTop: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#E0E7FF",
-    backgroundColor: "#F5F8FF",
-    padding: 12,
-    gap: 6,
+    marginTop: 18, borderRadius: 14,
+    borderWidth: 1, borderColor: "#E8ECF0",
+    backgroundColor: "#F8FAFC", padding: 14, gap: 6,
   },
-  validationTitle: { fontSize: 11, fontWeight: "900", color: "#344054", marginBottom: 4 },
+  validationTitle: {
+    fontSize: 11, fontFamily: "Sora_700Bold",
+    color: "#344054", marginBottom: 4,
+    textTransform: "uppercase", letterSpacing: 0.5,
+  },
   validationRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  validationCheck: { fontSize: 13, color: "#16A34A", fontWeight: "900", width: 16 },
-  validationCross: { fontSize: 13, color: "#9CA3AF", fontWeight: "900", width: 16 },
-  validationLabel: { fontSize: 12, fontWeight: "700", color: "#6B7280" },
+  validationCheck: { fontSize: 13, color: "#16A34A", fontFamily: "Sora_800ExtraBold", width: 16 },
+  validationCross: { fontSize: 13, color: "#9CA3AF", fontFamily: "Sora_800ExtraBold", width: 16 },
+  validationLabel: { fontSize: 12, fontFamily: "Sora_600SemiBold", color: "#6B7280" },
   validationLabelDone: { color: "#16A34A" },
 
-  linkBtn: { marginTop: 14, alignItems: "center" },
-  linkText: { color: "#475467", fontSize: 12, fontWeight: "700" },
+  signupBtn: { marginTop: 20, borderRadius: 14, overflow: "hidden" },
+  signupBtnFill: {
+    paddingVertical: 16, alignItems: "center", justifyContent: "center",
+  },
+  signupBtnText: {
+    color: "#FFFFFF", fontFamily: "Sora_700Bold",
+    fontSize: 15, letterSpacing: -0.2,
+  },
+
+  linkBtn: {
+    marginTop: 18, flexDirection: "row",
+    justifyContent: "center", alignItems: "center", gap: 6,
+  },
+  linkPrefix: { color: "#64748B", fontSize: 12, fontFamily: "Sora_400Regular" },
+  linkText: { color: "#0A8A7A", fontSize: 12, fontFamily: "Sora_700Bold" },
 
   footer: {
-    marginTop: 16,
-    color: "#98A2B3",
-    fontSize: 11,
-    fontWeight: "700",
+    marginTop: 20, color: "#94A3B8", fontSize: 11,
+    fontFamily: "SpaceMono_400Regular", letterSpacing: 0.5,
+    textAlign: "center",
   },
 });

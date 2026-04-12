@@ -75,7 +75,8 @@ function starsString(rating: number) {
   return "★".repeat(full) + (half ? "½" : "") + "☆".repeat(5 - full - (half ? 1 : 0));
 }
 
-const PAST_PAGE_SIZE = 6;
+const PAST_PAGE_SIZE = 3;
+const INST_PAGE_SIZE = 3;
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -90,8 +91,7 @@ export default function SessionsScreen() {
   const [results, setResults]                 = useState<ResultDoc[]>([]);
   const [dashData, setDashData]               = useState<any>(null);
 
-  // Combined filter
-  const [combinedFilter, setCombinedFilter]   = useState("All");
+  // Filters (defined in useMemo below)
 
   // Booking modal
   const [showBooking, setShowBooking]         = useState(false);
@@ -106,6 +106,7 @@ export default function SessionsScreen() {
 
   // Past sessions pagination
   const [pastVisibleCount, setPastVisibleCount] = useState(PAST_PAGE_SIZE);
+  const [instVisibleCount, setInstVisibleCount] = useState(INST_PAGE_SIZE);
 
   // ── Data Loading ───────────────────────────────────────────────────
 
@@ -160,25 +161,29 @@ export default function SessionsScreen() {
     return map;
   }, [results]);
 
-  // Combined filter options (merge languages + specialties)
-  const filterOptions = useMemo(() => {
+  // Separate language and skill filter options
+  const languageOptions = useMemo(() => {
     const set = new Set<string>();
-    instructors.forEach(i => {
-      i.languages?.forEach(l => set.add(`Lang: ${l}`));
-      i.specialties?.forEach(s => set.add(s));
-    });
+    instructors.forEach(i => i.languages?.forEach(l => set.add(l)));
     return ["All", ...Array.from(set).sort()];
   }, [instructors]);
 
+  const skillOptions = useMemo(() => {
+    const set = new Set<string>();
+    instructors.forEach(i => i.specialties?.forEach(s => set.add(s)));
+    return ["All", ...Array.from(set).sort()];
+  }, [instructors]);
+
+  const [langFilter, setLangFilter] = useState("All");
+  const [skillFilter, setSkillFilter] = useState("All");
+
   const filteredInstructors = useMemo(() => {
-    if (combinedFilter === "All") return instructors;
     return instructors.filter(i => {
-      if (combinedFilter.startsWith("Lang: ")) {
-        return (i.languages || []).includes(combinedFilter.replace("Lang: ", ""));
-      }
-      return (i.specialties || []).includes(combinedFilter);
+      if (langFilter !== "All" && !(i.languages || []).includes(langFilter)) return false;
+      if (skillFilter !== "All" && !(i.specialties || []).includes(skillFilter)) return false;
+      return true;
     });
-  }, [instructors, combinedFilter]);
+  }, [instructors, langFilter, skillFilter]);
 
   // ── Booking Flow ───────────────────────────────────────────────────
 
@@ -225,7 +230,7 @@ export default function SessionsScreen() {
   if (loading) {
     return (
       <View style={s.center}>
-        <ActivityIndicator size="large" color={colors.purpleDark} />
+        <ActivityIndicator size="large" color={colors.blue} />
         <Text style={page.centerText}>Loading sessions…</Text>
       </View>
     );
@@ -265,15 +270,34 @@ export default function SessionsScreen() {
       {/* ═══ 2. INSTRUCTOR DIRECTORY ══════════════════════════════════ */}
       <SectionHeader icon="📅" iconBg={colors.blueLighter} label="Book a New Session" />
 
-      {/* Single merged filter row */}
-      <FilterChips options={filterOptions} value={combinedFilter} onChange={setCombinedFilter} />
+      {/* Language filter */}
+      <Text style={s.filterLabel}>Language</Text>
+      <FilterChips options={languageOptions} value={langFilter} onChange={(v) => { setLangFilter(v); setInstVisibleCount(INST_PAGE_SIZE); }} />
+
+      {/* Skills filter */}
+      <Text style={s.filterLabel}>Specialties</Text>
+      <View style={s.filterWrap}>
+        {skillOptions.map(opt => {
+          const active = opt === skillFilter;
+          return (
+            <AnimatedPressable
+              key={opt}
+              onPress={() => { setSkillFilter(opt); setInstVisibleCount(INST_PAGE_SIZE); }}
+              scaleDown={0.95}
+              style={[s.filterChip, active && s.filterChipActive]}
+            >
+              <Text style={[s.filterChipText, active && s.filterChipTextActive]}>{opt}</Text>
+            </AnimatedPressable>
+          );
+        })}
+      </View>
 
       {/* Instructor Cards (simplified) */}
       {filteredInstructors.length === 0 ? (
         <EmptyState text="No instructors match your filters" />
       ) : (
         <View style={s.instructorGrid}>
-          {filteredInstructors.map(inst => {
+          {filteredInstructors.slice(0, instVisibleCount).map(inst => {
             const isExpanded = expandedInstructor === inst.instructor_id;
             return (
               <View key={inst.instructor_id} style={s.instCard}>
@@ -324,6 +348,16 @@ export default function SessionsScreen() {
               </View>
             );
           })}
+          {instVisibleCount < filteredInstructors.length && (
+            <AnimatedPressable
+              onPress={() => setInstVisibleCount(c => c + INST_PAGE_SIZE)}
+              style={s.loadMoreBtn}
+            >
+              <Text style={s.loadMoreText}>
+                Show More ({filteredInstructors.length - instVisibleCount} more)
+              </Text>
+            </AnimatedPressable>
+          )}
         </View>
       )}
 
@@ -367,8 +401,8 @@ export default function SessionsScreen() {
         <View style={{ gap: 10 }}>
           {visiblePast.map(sess => {
             const result = resultsBySession[sess.session_id];
-            const score = result?.analysis?.overall ?? 0;
-            const passed = score >= 70;
+            const score = result?.performance_score ?? result?.analysis?.overall ?? 0;
+            const passed = score >= 60;
 
             return (
               <SessionCard
@@ -518,6 +552,14 @@ const s = StyleSheet.create({
   content: { padding: space.page, paddingBottom: 40, gap: 12 },
   center:  { flex: 1, alignItems: "center", justifyContent: "center", padding: space.xxl },
 
+  // Filters
+  filterLabel: { fontSize: 12, fontFamily: fonts.bold, color: colors.subtext, marginTop: 4, marginBottom: -4 },
+  filterWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingVertical: 4 },
+  filterChip: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: colors.borderMid, backgroundColor: colors.cardBg },
+  filterChipActive: { backgroundColor: colors.blue, borderColor: colors.blue },
+  filterChipText: { fontSize: 13, fontFamily: fonts.medium, color: colors.subtext },
+  filterChipTextActive: { color: "#FFFFFF", fontFamily: fonts.semibold },
+
   // Stats row
   statsRow: {
     flexDirection: "row",
@@ -529,14 +571,14 @@ const s = StyleSheet.create({
   instructorGrid: { gap: 12 },
   instCard:       { backgroundColor: colors.cardBg, borderWidth: 1, borderColor: colors.border, borderRadius: radius.cardLg, padding: 14 },
   instTop:        { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 10 },
-  instAvatar:     { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.purpleDark, alignItems: "center", justifyContent: "center" },
+  instAvatar:     { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.blue, alignItems: "center", justifyContent: "center" },
   instAvatarText: { color: "#FFF", fontFamily: fonts.bold, fontSize: 14 },
   instName:       { fontFamily: fonts.bold, fontSize: 14, color: colors.textAlt },
   instRatingRow:  { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
   instStars:      { color: colors.amber, fontSize: 12 },
   instRatingNum:  { fontFamily: fonts.bold, fontSize: 12, color: colors.textAlt },
   instReviews:    { fontSize: 11, color: colors.subtext },
-  instPrice:      { fontFamily: fonts.bold, fontSize: 13, color: colors.purpleDark },
+  instPrice:      { fontFamily: fonts.bold, fontSize: 13, color: colors.blue },
   instSpecialties:{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 8 },
   specPill:       { paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.pageBg },
   specText:       { fontSize: 11, fontFamily: fonts.extrabold, color: colors.label },
@@ -545,14 +587,14 @@ const s = StyleSheet.create({
   instActions:    { flexDirection: "row", gap: 8 },
   detailsBtn:     { flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: radius.input, paddingVertical: 10, alignItems: "center" },
   detailsBtnText: { fontFamily: fonts.extrabold, fontSize: 12, color: colors.label },
-  instBtn:        { flex: 2, backgroundColor: colors.purpleDark, borderRadius: radius.input, paddingVertical: 10, alignItems: "center" },
+  instBtn:        { flex: 2, backgroundColor: colors.blue, borderRadius: radius.input, paddingVertical: 10, alignItems: "center" },
   instBtnText:    { color: "#FFF", fontFamily: fonts.extrabold, fontSize: 12 },
 
   // Upcoming cards
   upcomingGrid:      { gap: 10 },
   upcomingCard:      { backgroundColor: colors.cardBg, borderWidth: 1, borderColor: colors.border, borderRadius: radius.cardLg, padding: 14 },
   upcomingTop:       { flexDirection: "row", alignItems: "center", gap: 12 },
-  upcomingAvatar:    { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.purpleDark, alignItems: "center", justifyContent: "center" },
+  upcomingAvatar:    { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.blue, alignItems: "center", justifyContent: "center" },
   upcomingAvatarText:{ color: "#FFF", fontFamily: fonts.bold, fontSize: 13 },
   upcomingName:      { fontFamily: fonts.bold, fontSize: 13, color: colors.textAlt },
   upcomingDate:      { fontSize: 12, fontFamily: fonts.medium, color: colors.subtext, marginTop: 2 },
@@ -566,7 +608,7 @@ const s = StyleSheet.create({
   loadMoreBtn: {
     alignItems: "center",
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: radius.card,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.cardBg,
@@ -584,7 +626,7 @@ const s = StyleSheet.create({
   modalTitle:        { fontFamily: fonts.bold, fontSize: 18, color: colors.textAlt },
   modalClose:        { fontSize: 22, color: colors.subtext, padding: 4 },
   modalInstRow:      { flexDirection: "row", alignItems: "center", gap: 14, backgroundColor: colors.pageBg, borderRadius: radius.card, padding: 14, marginBottom: 16 },
-  modalInstAvatar:   { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.purpleDark, alignItems: "center", justifyContent: "center" },
+  modalInstAvatar:   { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.blue, alignItems: "center", justifyContent: "center" },
   modalInstAvatarText:{ color: "#FFF", fontFamily: fonts.extrabold, fontSize: 16 },
   modalInstName:     { fontFamily: fonts.bold, fontSize: 15, color: colors.textAlt },
   modalInstMeta:     { fontSize: 12, fontFamily: fonts.bold, color: colors.subtext, marginTop: 2 },
@@ -597,7 +639,7 @@ const s = StyleSheet.create({
   scheduleCol:         { alignItems: "center", minWidth: 80 },
   scheduleColHeader:   { fontFamily: fonts.extrabold, fontSize: 11, color: colors.textAlt, marginBottom: 8, textAlign: "center" },
   scheduleSlot:        { borderWidth: 1, borderColor: colors.border, borderRadius: radius.input, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: colors.pageBg, marginBottom: 6, width: "100%" as any, alignItems: "center" },
-  scheduleSlotSelected:    { backgroundColor: colors.purpleDark, borderColor: colors.purpleDark },
+  scheduleSlotSelected:    { backgroundColor: colors.blue, borderColor: colors.blue },
   scheduleSlotBooked:      { backgroundColor: colors.disabledBg, borderColor: colors.disabledBorder, opacity: 0.7 },
   scheduleSlotText:        { fontFamily: fonts.bold, fontSize: 12, color: colors.label },
   scheduleSlotBookedLabel: { fontSize: 9, fontFamily: fonts.bold, color: colors.disabled, marginTop: 1 },
@@ -609,7 +651,7 @@ const s = StyleSheet.create({
 
   // Modal actions
   modalActions:   { gap: 10, marginTop: 8 },
-  confirmBtn:     { backgroundColor: colors.purpleDark, borderRadius: radius.input, paddingVertical: 14, alignItems: "center" },
+  confirmBtn:     { backgroundColor: colors.blue, borderRadius: radius.input, paddingVertical: 14, alignItems: "center" },
   confirmBtnText: { color: "#FFF", fontFamily: fonts.bold, fontSize: 14 },
   modalCancelBtn: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.input, paddingVertical: 12, alignItems: "center" },
   modalCancelText:{ fontFamily: fonts.bold, fontSize: 13, color: colors.textAlt },

@@ -43,11 +43,12 @@ const s = StyleSheet.create({
     minWidth: 150,
   },
   iconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: radius.sm,
+    width: 42,
+    height: 42,
+    borderRadius: radius.md,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
   },
   iconText: {
     fontSize: 18,

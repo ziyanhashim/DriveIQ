@@ -121,7 +121,7 @@ export default function ReportsScreen() {
     for (const r of resultsRaw) {
       const tid = r?.trainee_id;
       if (tid && !m[tid]) {
-        m[tid] = r?.trainee_name || r?.instructor_name || "Unknown Student";
+        m[tid] = r?.trainee_name || "Unknown Student";
       }
     }
     return m;
@@ -155,7 +155,7 @@ export default function ReportsScreen() {
         session_id: r?.session_id || "",
         date: fmtDate(r?.created_at),
         roadType: roadTypeFrom(r),
-        score: r?.performance_score ?? r?.analysis?.overall ?? 0,
+        score: Math.round(r?.performance_score ?? r?.analysis?.overall ?? 0),
         passed: (r?.performance_score ?? r?.analysis?.overall ?? 0) >= 60,
         behavior: r?.analysis?.behavior || "—",
       }));
@@ -186,7 +186,7 @@ export default function ReportsScreen() {
   if (loading) {
     return (
       <View style={page.center}>
-        <ActivityIndicator size="large" color={colors.purpleDark} />
+        <ActivityIndicator size="large" color={colors.blue} />
         <Text style={page.centerText}>Loading reports...</Text>
       </View>
     );
@@ -217,8 +217,8 @@ export default function ReportsScreen() {
             }}
             style={[s.sortBtn, sortBy === "name" && s.sortBtnActive]}
           >
-            <Ionicons name={sortDir === "asc" && sortBy === "name" ? "arrow-up" : "arrow-down"} size={14} color={sortBy === "name" ? colors.purpleDark : colors.subtext} />
-            <Text style={[s.sortBtnText, sortBy === "name" && { color: colors.purpleDark }]}>A-Z</Text>
+            <Ionicons name={sortDir === "asc" && sortBy === "name" ? "arrow-up" : "arrow-down"} size={14} color={sortBy === "name" ? colors.blue : colors.subtext} />
+            <Text style={[s.sortBtnText, sortBy === "name" && { color: colors.blue }]}>A-Z</Text>
           </Pressable>
           <Pressable
             onPress={() => {
@@ -227,8 +227,8 @@ export default function ReportsScreen() {
             }}
             style={[s.sortBtn, sortBy === "score" && s.sortBtnActive]}
           >
-            <Ionicons name={sortDir === "desc" && sortBy === "score" ? "arrow-down" : "arrow-up"} size={14} color={sortBy === "score" ? colors.purpleDark : colors.subtext} />
-            <Text style={[s.sortBtnText, sortBy === "score" && { color: colors.purpleDark }]}>Score</Text>
+            <Ionicons name={sortDir === "desc" && sortBy === "score" ? "arrow-down" : "arrow-up"} size={14} color={sortBy === "score" ? colors.blue : colors.subtext} />
+            <Text style={[s.sortBtnText, sortBy === "score" && { color: colors.blue }]}>Score</Text>
           </Pressable>
         </View>
       </FadeInView>
@@ -352,7 +352,7 @@ const s = StyleSheet.create({
     backgroundColor: colors.cardBg, borderWidth: 1, borderColor: colors.border,
     borderRadius: radius.input,
   },
-  sortBtnActive: { borderColor: colors.purpleBorder, backgroundColor: tint.purple.bg },
+  sortBtnActive: { borderColor: colors.blueBorder, backgroundColor: tint.blue.bg },
   sortBtnText: { fontSize: 12, fontFamily: fonts.bold, color: colors.subtext, userSelect: "none" },
 
   // Learner card
@@ -363,14 +363,14 @@ const s = StyleSheet.create({
   learnerHeader: { flexDirection: "row", alignItems: "center", gap: 12 },
   avatar: {
     width: 42, height: 42, borderRadius: 21,
-    backgroundColor: tint.purple.bg, alignItems: "center", justifyContent: "center",
+    backgroundColor: tint.blue.bg, alignItems: "center", justifyContent: "center",
   },
-  avatarText: { fontSize: 14, fontFamily: fonts.extrabold, color: colors.purpleDark },
+  avatarText: { fontSize: 14, fontFamily: fonts.extrabold, color: colors.blue },
   learnerName: { fontSize: 14, fontFamily: fonts.bold, color: colors.textAlt },
   learnerMeta: { fontSize: 12, fontFamily: fonts.medium, color: colors.subtext, marginTop: 2 },
   scoreBadge: {
     flexDirection: "row", alignItems: "baseline",
-    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.sm,
   },
   scoreText: { fontSize: 16, fontFamily: fonts.extrabold },
   scoreUnit: { fontSize: 10, fontFamily: fonts.bold, marginLeft: 1 },
@@ -392,12 +392,12 @@ const s = StyleSheet.create({
   statusPill: { borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 2 },
   statusPillText: { fontSize: 10, fontFamily: fonts.extrabold, color: "#fff" },
   sessionScore: {
-    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.sm,
   },
   sessionScoreText: { fontSize: 14, fontFamily: fonts.extrabold },
   viewBtn: {
     paddingHorizontal: 12, paddingVertical: 8,
-    backgroundColor: colors.darkBtn, borderRadius: radius.input,
+    backgroundColor: colors.blue, borderRadius: radius.input,
   },
   viewBtnText: { fontSize: 12, fontFamily: fonts.bold, color: "#fff" },
 

@@ -48,3 +48,11 @@ app.include_router(sessions_router)
 @app.on_event("startup")
 def startup():
     ensure_indexes()
+
+    # Clean up expired availability slots
+    from app.database import availability_col
+    from app.utils import now_utc
+    today = now_utc().strftime("%Y-%m-%d")
+    deleted = availability_col.delete_many({"date": {"$lt": today}})
+    if deleted.deleted_count:
+        print(f"Cleaned up {deleted.deleted_count} expired availability slots")

@@ -7,20 +7,35 @@ import { router, useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiGet, apiDelete } from "../../lib/api";
 import { colors, fonts, type_, radius, space, shadow, card, btn, pill, page, divider, tint, TintKey } from "../../lib/theme";
-import { LinearGradient } from "expo-linear-gradient";
 import FadeInView from "../../components/FadeInView";
 import AnimatedPressable from "../../components/AnimatedPressable";
+import { LineChart, PieChart } from "react-native-chart-kit";
+import { Text as SvgText } from "react-native-svg";
 
 // Shared components
 import SectionHeader from "../../components/SectionHeader";
 import MetricCard from "../../components/MetricCard";
 import SessionCard from "../../components/SessionCard";
-import RecommendationQueue, { Recommendation } from "../../components/RecommendationQueue";
 import EmptyState from "../../components/EmptyState";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type CommentItem = { id: string; date: string; text: string; rating: number };
+type CommentItem = { id: string; instructor_name: string; date: string; text: string; rating: number };
+
+function formatCommentDate(iso: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  const month = d.toLocaleDateString("en-US", { month: "long" });
+  const day = d.getDate();
+  const suffix =
+    day % 10 === 1 && day !== 11 ? "st"
+    : day % 10 === 2 && day !== 12 ? "nd"
+    : day % 10 === 3 && day !== 13 ? "rd"
+    : "th";
+  const time = d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
+  return `${month} ${day}${suffix}, ${time}`;
+}
 type Achievement = { id: string; title: string; subtitle: string; icon: string; earned: boolean };
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -114,7 +129,8 @@ export default function Dashboard() {
   const recentReports = useMemo(() => {
     const list = Array.isArray(dash?.recent_reports) ? dash.recent_reports : [];
     return list.map((r: any, idx: number) => {
-      const score = r?.score?.overall ?? r?.score ?? 0;
+      const rawScore = r?.score?.overall ?? r?.score ?? 0;
+      const score = Math.round(rawScore);
       const date  = r?.date_label || r?.date || (r?.created_at ? new Date(r.created_at).toLocaleDateString() : "—");
       const instructor = r?.instructor_name || r?.instructor || "—";
       return {
@@ -123,22 +139,40 @@ export default function Dashboard() {
         date,
         instructor,
         score,
-        passed: score >= 70,
+        passed: score >= 60,
       };
     });
   }, [dash]);
 
-  // AI feedback as recommendations
-  const recommendations: Recommendation[] = useMemo(() => {
-    const list = Array.isArray(dash?.ai_feedback) ? dash.ai_feedback : [];
-    return list.map((f: any, idx: number) => ({
-      id: f?.id || `f-${idx}`,
-      icon: f?.icon || "💡",
-      title: f?.title || f?.area || "Tip",
-      message: f?.message || f?.hint || "",
-      score: typeof f?.score === "number" ? f.score : undefined,
-      priority: (f?.priority as "high" | "medium" | "low") ?? "medium",
-    }));
+  // Behavior distribution for pie chart
+  const behaviorData = useMemo(() => {
+    let normal = 0, aggressive = 0, drowsy = 0;
+    const reports = Array.isArray(dash?.recent_reports) ? dash.recent_reports : [];
+    for (const r of reports) {
+      const ws = r?.window_summary;
+      if (ws) { normal += ws.normal || 0; aggressive += ws.aggressive || 0; drowsy += ws.drowsy || 0; }
+    }
+    const total = normal + aggressive + drowsy;
+    if (total === 0) return null;
+    return [
+      { name: "Normal", count: normal, color: colors.green, legendFontColor: colors.label, legendFontSize: 12, legendFontFamily: fonts.semibold },
+      { name: "Aggressive", count: aggressive, color: colors.redDeep, legendFontColor: colors.label, legendFontSize: 12, legendFontFamily: fonts.semibold },
+      { name: "Drowsy", count: drowsy, color: colors.amber, legendFontColor: colors.label, legendFontSize: 12, legendFontFamily: fonts.semibold },
+    ].filter(d => d.count > 0);
+  }, [dash]);
+
+  // Score trend data for line chart
+  const scoreTrendData = useMemo(() => {
+    const reports = Array.isArray(dash?.recent_reports) ? dash.recent_reports : [];
+    const sorted = [...reports]
+      .filter((r: any) => typeof (r?.score?.overall ?? r?.score) === "number" && (r?.score?.overall ?? r?.score) > 0)
+      .slice(-10)
+      .reverse();
+    if (sorted.length < 2) return null;
+    return {
+      labels: sorted.map((_: any, i: number) => `S${i + 1}`),
+      datasets: [{ data: sorted.map((r: any) => r?.score?.overall ?? r?.score ?? 0), strokeWidth: 2 }],
+    };
   }, [dash]);
 
   // Comments
@@ -146,7 +180,8 @@ export default function Dashboard() {
     const list = Array.isArray(dash?.instructor_comments) ? dash.instructor_comments : [];
     return list.map((c: any, idx: number) => ({
       id: c?.id || `c-${idx}`,
-      date: c?.date ?? (c?.created_at ? new Date(c.created_at).toLocaleDateString() : "—"),
+      instructor_name: c?.instructor_name || "",
+      date: c?.date ?? (c?.created_at || ""),
       text: c?.text || c?.comment || "",
       rating: c?.rating ?? 0,
     }));
@@ -169,7 +204,7 @@ export default function Dashboard() {
   if (loading) {
     return (
       <View style={s.center}>
-        <ActivityIndicator size="large" color={colors.purpleDark} />
+        <ActivityIndicator size="large" color={colors.blue} />
         <Text style={page.centerText}>Loading dashboard…</Text>
       </View>
     );
@@ -181,161 +216,232 @@ export default function Dashboard() {
     <View style={{ flex: 1 }}>
     <ScrollView style={s.page} contentContainerStyle={s.content}>
 
-      {/* ── 1. Hero ───────────────────────────────────────────────────────── */}
+      {/* ── 1. Greeting ─────────────────────────────────────────────────── */}
       <FadeInView delay={0}>
-      <LinearGradient colors={[colors.purpleDark, "#4C1D95"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.hero}>
-        <View style={{ flex: 1 }}>
-          <Text style={s.heroHello}>
-            {studentName ? `Hello, ${studentName} 👋` : "Welcome back 👋"}
-          </Text>
-          <Text style={s.heroSub}>Great to see you back! Let's keep improving your driving skills.</Text>
-        </View>
-      </LinearGradient>
+        <Text style={s.greeting}>
+          {studentName ? `Hello, ${studentName} 👋` : "Welcome back 👋"}
+        </Text>
+        <Text style={s.greetingSub}>Here's your driving progress at a glance.</Text>
       </FadeInView>
 
-      {/* ── 2. KPI Strip ──────────────────────────────────────────────────── */}
+      {/* ── 2. Chart + Stats (side by side on wide, stacked on mobile) ── */}
       <FadeInView delay={80}>
-      <View style={s.kpiStrip}>
-        <MetricCard
-          label="Driving Score"
-          value={currentDrivingScore > 0 ? `${currentDrivingScore}%` : "—"}
-          icon="🎯"
-          tintKey={scoreTint}
-          subtitle={scoreLabel !== "—" ? scoreLabel : undefined}
-        />
-        <MetricCard
-          label="Sessions"
-          value={sessionsTotal > 0 ? `${sessionsCompleted}/${sessionsTotal}` : `${sessionsCompleted}`}
-          icon="📊"
-          tintKey="blue"
-          subtitle={sessionsTotal > 0 ? `${Math.max(0, sessionsTotal - sessionsCompleted)} remaining` : undefined}
-        />
-        <MetricCard
-          label="Safety Badge"
-          value={scoreLabel}
-          icon="🛡️"
-          tintKey="purple"
-        />
-        <MetricCard
-          label="Next Goal"
-          value="🎯"
-          icon="🏆"
-          tintKey="yellow"
-          subtitle={goalText}
-        />
-      </View>
-      </FadeInView>
-
-      {/* ── 3. Next Session (promoted above fold) ──────────────────────── */}
-      <FadeInView delay={160}>
-      <View style={card.base}>
-        <SectionHeader icon="🗓️" iconBg={colors.greenBorderAlt} label="Upcoming Sessions" count={upcomingList.length > 0 ? upcomingList.length : undefined} />
-        {upcomingList.length === 0 ? (
-          <View style={s.emptyBox}>
-            <Text style={s.emptyText}>No upcoming sessions scheduled.</Text>
-            <AnimatedPressable onPress={() => router.navigate("/(studenttabs)/sessions" as any)} style={[s.outlineBtn, { marginTop: 0 }]}>
-              <Text style={s.outlineBtnText}>Book a Session</Text>
-            </AnimatedPressable>
-          </View>
-        ) : (
-          <View style={{ gap: 10, marginTop: 10 }}>
-            {upcomingList.map((u, idx) => (
-              <View key={u.booking_id || idx} style={s.upcomingCard}>
-                <View style={[s.upcomingRow, isWide && { flexDirection: "row" }]}>
-                  <InfoPill label="Date"       value={u.dateLabel}  icon="🗓️" bg={tint.indigo.bg} border={tint.indigo.border} />
-                  <InfoPill label="Time"       value={u.timeLabel}  icon="🕑" bg={tint.purple.bg} border={tint.purple.border} />
-                  <InfoPill label="Instructor" value={u.instructor} icon="👤" bg={tint.green.bg}  border={tint.green.border}  />
-                </View>
-                <View style={s.countdownRow}>
-                  <Text style={s.countdownText}>🕒 {countdownFor(u.dateISO)}</Text>
-                  <AnimatedPressable
-                    onPress={() => setManageBooking(u)}
-                    style={[s.outlineBtn, { marginTop: 0 }]}
+      <View style={[s.heroRow, isWide && s.heroRowWide]}>
+        {/* Left: Score Trend Chart */}
+        <View style={[s.chartCard, isWide && { flex: 1 }]}>
+          <Text style={s.chartTitle}>Score Trend</Text>
+          {scoreTrendData ? (
+            <LineChart
+              data={{
+                labels: scoreTrendData.labels,
+                datasets: [
+                  scoreTrendData.datasets[0],
+                  { data: [110], withDots: false } as any, // invisible ceiling so top labels aren't clipped
+                ],
+              }}
+              width={isWide ? Math.floor((width - 60) / 2) : width - 48}
+              height={220}
+              withVerticalLabels
+              withHorizontalLabels={false}
+              withDots
+              yAxisSuffix=""
+              yAxisInterval={1}
+              fromZero
+              segments={4}
+              renderDotContent={({ x, y, index, indexData }: any) => {
+                const realData = scoreTrendData!.datasets[0].data;
+                if (index >= realData.length) return null; // skip the ceiling dataset
+                return (
+                  <SvgText
+                    key={`dot-${index}`}
+                    x={x}
+                    y={y - 10}
+                    fontSize={11}
+                    fontFamily={fonts.semibold}
+                    fill={colors.text}
+                    textAnchor="middle"
                   >
-                    <Text style={s.outlineBtnText}>Manage →</Text>
-                  </AnimatedPressable>
-                </View>
-              </View>
-            ))}
-          </View>
-        )}
-      </View>
-      </FadeInView>
-
-      {/* ── 4. Recent Sessions ─────────────────────────────────────────── */}
-      <FadeInView delay={240}>
-      <View style={card.base}>
-        <SectionHeader icon="📄" iconBg={colors.blueLighter} label="Recent Reports" />
-        {recentReports.length === 0 ? (
-          <View style={s.inlineEmpty}>
-            <Text style={s.inlineEmptyText}>No reports yet. Complete a session to see your results.</Text>
-          </View>
-        ) : (
-          <View style={s.recentGrid}>
-            {recentReports.slice(0, 4).map((r: any) => (
-              <SessionCard
-                key={r.id}
-                sessionId={r.session_id}
-                date={r.date}
-                performanceScore={r.score}
-                passed={r.passed}
-                instructorName={r.instructor}
-                variant="compact"
-                onPress={() => router.push({
-                  pathname: "/(studenttabs)/session-report",
-                  params: { sessionId: r.session_id, from: "dashboard" },
-                })}
-              />
-            ))}
-          </View>
-        )}
-      </View>
-      </FadeInView>
-
-      {/* ── 5. AI Insights ─────────────────────────────────────────────── */}
-      {recommendations.length > 0 && (
-        <FadeInView delay={320}>
-        <View style={card.base}>
-          <SectionHeader icon="💡" iconBg={tint.amber.bg} label="AI Insights" />
-          <RecommendationQueue items={recommendations} maxVisible={3} />
-        </View>
-        </FadeInView>
-      )}
-
-      {/* ── 6. Instructor Comments ─────────────────────────────────────── */}
-      {comments.length > 0 && (
-        <View style={card.base}>
-          <SectionHeader icon="💬" iconBg={colors.purpleBorder} label="Instructor Comments" count={comments.length} />
-          <View style={s.commentsGrid}>
-            {visibleComments.map((c) => (
-              <View key={c.id} style={s.commentCard}>
-                <View style={s.commentTop}>
-                  <Text style={s.commentDate}>{c.date}</Text>
-                  {c.rating > 0 && (
-                    <View style={s.ratingRow}>
-                      <Text style={{ fontSize: 13 }}>⭐</Text>
-                      <Text style={s.ratingText}>{c.rating}</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={s.commentText}>{c.text}</Text>
-              </View>
-            ))}
-          </View>
-          {comments.length > 3 && (
-            <Pressable onPress={() => setShowAllComments(!showAllComments)} style={({ pressed }) => [s.showMoreBtn, pressed && { opacity: 0.7 }]}>
-              <Text style={s.showMoreText}>
-                {showAllComments ? "Show less" : `Show ${comments.length - 3} more`}
-              </Text>
-            </Pressable>
+                    {Math.round(realData[index])}
+                  </SvgText>
+                );
+              }}
+              chartConfig={{
+                backgroundColor: colors.cardBg,
+                backgroundGradientFrom: colors.cardBg,
+                backgroundGradientTo: colors.cardBg,
+                decimalPlaces: 0,
+                color: (opacity = 1) => `rgba(10, 138, 122, ${opacity})`,
+                labelColor: () => colors.subtext,
+                propsForLabels: { fontFamily: fonts.semibold, fontSize: 11 },
+                propsForDots: { r: "5", strokeWidth: "2", stroke: colors.blue },
+                propsForBackgroundLines: { strokeDasharray: "", stroke: colors.borderFaint },
+                fillShadowGradientFrom: colors.blue,
+                fillShadowGradientTo: colors.cardBg,
+                fillShadowGradientFromOpacity: 0.2,
+                fillShadowGradientToOpacity: 0,
+              }}
+              bezier
+              style={{ borderRadius: radius.md, alignSelf: "center", marginTop: 8 }}
+            />
+          ) : (
+            <View style={s.chartEmpty}>
+              <Text style={s.chartEmptyText}>Complete more sessions to see your score trend</Text>
+            </View>
           )}
         </View>
-      )}
+
+        {/* Right: Key Stats — 2 columns, each column is a vertical stack */}
+        <View style={[s.statsOuter, isWide && { flex: 1 }]}>
+          <View style={s.statsRow}>
+            <View style={s.statsCol}>
+              <View style={[s.statCard, { borderLeftColor: scoreTint === "green" ? colors.green : scoreTint === "yellow" ? colors.amber : colors.redDeep }]}>
+                <Text style={s.statLabel}>Driving Score</Text>
+                <Text style={s.statValue}>{currentDrivingScore > 0 ? `${currentDrivingScore}%` : "—"}</Text>
+                <Text style={s.statSub}>{scoreLabel}</Text>
+              </View>
+              <View style={[s.statCard, { borderLeftColor: colors.amber }]}>
+                <Text style={s.statLabel}>Next Goal</Text>
+                <Text style={[s.statSub, { marginTop: 4 }]}>{goalText}</Text>
+              </View>
+            </View>
+            <View style={s.statsCol}>
+              <View style={[s.statCard, { borderLeftColor: colors.blue }]}>
+                <Text style={s.statLabel}>Sessions</Text>
+                <Text style={s.statValue}>{sessionsTotal > 0 ? `${sessionsCompleted}/${sessionsTotal}` : `${sessionsCompleted}`}</Text>
+                <Text style={s.statSub}>{sessionsTotal > 0 ? `${Math.max(0, sessionsTotal - sessionsCompleted)} remaining` : "Keep going"}</Text>
+              </View>
+              <View style={[s.statCard, { borderLeftColor: colors.indigo || "#6366F1" }]}>
+                <Text style={s.statLabel}>Last Session</Text>
+                <Text style={s.statValue}>{recentReports.length > 0 ? recentReports[0].date : "—"}</Text>
+                <Text style={s.statSub}>{recentReports.length > 0 ? recentReports[0].instructor : ""}</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      </View>
+      </FadeInView>
+
+      {/* ── Row 1: Upcoming Sessions + Behavior Distribution ──────────── */}
+      <FadeInView delay={160}>
+      <View style={[s.cardRow, isWide && s.cardRowWide]}>
+        <View style={[card.base, isWide && { flex: 1.3 }]}>
+          <SectionHeader icon="🗓️" iconBg={colors.greenBorderAlt} label="Upcoming Sessions" count={upcomingList.length > 0 ? upcomingList.length : undefined} />
+          {upcomingList.length === 0 ? (
+            <View style={s.emptyBox}>
+              <Text style={s.emptyText}>No upcoming sessions scheduled.</Text>
+              <AnimatedPressable onPress={() => router.navigate("/(studenttabs)/sessions" as any)} style={[s.outlineBtn, { marginTop: 0 }]}>
+                <Text style={s.outlineBtnText}>Book a Session</Text>
+              </AnimatedPressable>
+            </View>
+          ) : (
+            <View style={{ gap: 10, marginTop: 10 }}>
+              {upcomingList.map((u, idx) => (
+                <View key={u.booking_id || idx} style={s.upcomingCard}>
+                  <View style={[s.upcomingRow, isWide && { flexDirection: "row" }]}>
+                    <InfoPill label="Date"       value={u.dateLabel}  icon="🗓️" bg={tint.indigo.bg} border={tint.indigo.border} />
+                    <InfoPill label="Time"       value={u.timeLabel}  icon="🕑" bg={tint.purple.bg} border={tint.purple.border} />
+                    <InfoPill label="Instructor" value={u.instructor} icon="👤" bg={tint.green.bg}  border={tint.green.border}  />
+                  </View>
+                  <View style={s.countdownRow}>
+                    <Text style={s.countdownText}>🕒 {countdownFor(u.dateISO)}</Text>
+                    <AnimatedPressable
+                      onPress={() => setManageBooking(u)}
+                      style={[s.outlineBtn, { marginTop: 0 }]}
+                    >
+                      <Text style={s.outlineBtnText}>Manage →</Text>
+                    </AnimatedPressable>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
+        {behaviorData && behaviorData.length > 0 && (
+          <View style={[card.base, isWide && { flex: 1 }]}>
+            <SectionHeader icon="🧠" iconBg={tint.purple.bg} label="Behavior Distribution" />
+            <View style={{ marginTop: 12, alignItems: "center", flex: 1, justifyContent: "center" }}>
+              <PieChart
+                data={behaviorData}
+                width={isWide ? Math.min((width - 60) * 0.42, 360) : Math.min(width - 60, 500)}
+                height={200}
+                chartConfig={{
+                  color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+                }}
+                accessor="count"
+                backgroundColor="transparent"
+                paddingLeft="15"
+                absolute={false}
+              />
+            </View>
+          </View>
+        )}
+      </View>
+      </FadeInView>
+
+      {/* ── Row 2: Recent Reports + Instructor Comments ───────────────── */}
+      <FadeInView delay={240}>
+      <View style={[s.cardRow, isWide && s.cardRowWide]}>
+        <View style={[card.base, isWide && { flex: 1.3 }]}>
+          <SectionHeader icon="📄" iconBg={colors.blueLighter} label="Recent Reports" />
+          {recentReports.length === 0 ? (
+            <View style={s.inlineEmpty}>
+              <Text style={s.inlineEmptyText}>No reports yet. Complete a session to see your results.</Text>
+            </View>
+          ) : (
+            <View style={s.recentGrid}>
+              {recentReports.slice(0, 4).map((r: any) => (
+                <SessionCard
+                  key={r.id}
+                  sessionId={r.session_id}
+                  date={r.date}
+                  performanceScore={r.score}
+                  passed={r.passed}
+                  instructorName={r.instructor}
+                  variant="compact"
+                  onPress={() => router.push({
+                    pathname: "/(studenttabs)/session-report",
+                    params: { sessionId: r.session_id, from: "dashboard" },
+                  })}
+                />
+              ))}
+            </View>
+          )}
+        </View>
+
+        {comments.length > 0 && (
+          <View style={[card.base, isWide && { flex: 1 }]}>
+            <SectionHeader icon="💬" iconBg={colors.purpleBorder} label="Instructor Comments" count={comments.length} />
+            <View style={s.commentsGrid}>
+              {comments.map((c) => (
+                <View key={c.id} style={s.commentCard}>
+                  <View style={s.commentTop}>
+                    <View>
+                      {c.instructor_name !== "" && (
+                        <Text style={s.commentName}>{c.instructor_name}</Text>
+                      )}
+                      <Text style={s.commentDate}>{formatCommentDate(c.date)}</Text>
+                    </View>
+                    {c.rating > 0 && (
+                      <View style={s.ratingRow}>
+                        <Text style={{ fontSize: 13 }}>⭐</Text>
+                        <Text style={s.ratingText}>{c.rating}</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={s.commentText}>{c.text}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+      </View>
+      </FadeInView>
 
       {/* ── 7. Achievements ────────────────────────────────────────────── */}
       {achievements.length > 0 && (
-        <View style={card.base}>
-          <SectionHeader icon="🏅" iconBg={colors.yellowBg} label="Achievements & Milestones" />
+        <View style={[card.base, { backgroundColor: colors.darkBg, borderColor: colors.darkCard }]}>
+          <SectionHeader icon="🏅" iconBg="rgba(250,204,21,0.15)" label="Achievements & Milestones" labelStyle={{ color: "#FFFFFF" }} />
           <View style={[s.achGrid, isWide && { flexDirection: "row" }]}>
             {achievements.map((a) => (
               <View key={a.id} style={[s.achCard, isWide && { flex: 1 }, a.earned ? s.achEarned : s.achLocked]}>
@@ -431,17 +537,48 @@ const s = StyleSheet.create({
   content: { padding: space.page, paddingBottom: 32, gap: 14 },
   center:  { flex: 1, alignItems: "center", justifyContent: "center", padding: space.xxl },
 
-  // Hero
-  hero:          { borderRadius: radius.cardXl, padding: space.xl, backgroundColor: colors.purpleDark, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomColor: colors.purpleDeep, borderBottomWidth: 2, ...shadow.cardRaised },
-  heroHello:     { color: "#FFFFFF", fontSize: 16, fontFamily: fonts.bold },
-  heroSub:       { color: "rgba(255,255,255,0.82)", fontSize: 12, marginTop: 6, maxWidth: 280, fontFamily: fonts.medium },
+  // Greeting
+  greeting: { fontSize: 20, fontFamily: fonts.extrabold, color: colors.text, letterSpacing: -0.3 },
+  greetingSub: { fontSize: 13, fontFamily: fonts.medium, color: colors.subtext, marginTop: 4 },
 
-  // KPI Strip
-  kpiStrip: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
+  // Hero row (chart + stats)
+  heroRow: { flexDirection: "column", gap: 12 },
+  heroRowWide: { flexDirection: "row", gap: 12, alignItems: "stretch" },
+  chartCard: {
+    backgroundColor: colors.cardBg,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingTop: space.md,
+    paddingBottom: 0,
+    paddingLeft: space.sm,
+    paddingRight: space.sm,
+    ...shadow.card,
   },
+  chartTitle: { fontSize: 13, fontFamily: fonts.extrabold, color: colors.textAlt, letterSpacing: -0.2, paddingLeft: space.xs },
+  chartEmpty: { height: 220, alignItems: "center", justifyContent: "center" },
+  chartEmptyText: { fontSize: 12, fontFamily: fonts.medium, color: colors.subtext, textAlign: "center" },
+  statsOuter: {},
+  statsRow: { flexDirection: "row", gap: 8, flex: 1 },
+  statsCol: { flex: 1, gap: 8 },
+  statCard: {
+    backgroundColor: colors.cardBg,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderLeftWidth: 3,
+    padding: space.md,
+    justifyContent: "center",
+    flex: 1,
+    ...shadow.card,
+  },
+  statLabel: { fontSize: 10, fontFamily: fonts.semibold, color: colors.subtext, letterSpacing: 0.3, textTransform: "uppercase" },
+  statValue: { fontSize: 18, fontFamily: fonts.extrabold, color: colors.text, marginTop: 3, letterSpacing: -0.5 },
+  statSub: { fontSize: 11, fontFamily: fonts.medium, color: colors.subtextAlt, marginTop: 2 },
+
+  // Card rows (side-by-side on wide)
+  cardRow: { flexDirection: "column", gap: 12 },
+  cardRowWide: { flexDirection: "row", gap: 12, alignItems: "stretch" },
 
   // Upcoming
   upcomingCard:  { borderWidth: 1, borderColor: colors.border, borderRadius: radius.input, padding: space.md, backgroundColor: colors.cardBg, gap: 10 },
@@ -473,8 +610,9 @@ const s = StyleSheet.create({
   // Comments
   commentsGrid: { flexDirection: "column", gap: 12, marginTop: 12 },
   commentCard:  { borderRadius: radius.input, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.pageBg, padding: space.md },
-  commentTop:   { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  commentDate:  { fontSize: 12, color: colors.purpleDark, fontFamily: fonts.bold },
+  commentTop:   { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" },
+  commentName:  { fontSize: 13, color: colors.textAlt, fontFamily: fonts.bold, marginBottom: 2 },
+  commentDate:  { fontSize: 12, color: colors.subtext, fontFamily: fonts.semibold },
   ratingRow:    { flexDirection: "row", alignItems: "center", gap: 4 },
   ratingText:   { ...type_.body, color: colors.textAlt, fontFamily: fonts.extrabold },
   commentText:  { ...type_.body, color: colors.label, marginTop: 10 },
@@ -484,13 +622,13 @@ const s = StyleSheet.create({
   // Achievements
   achGrid:     { flexDirection: "column", gap: 10, marginTop: 12 },
   achCard:     { borderRadius: radius.card, borderWidth: 1, padding: 14, alignItems: "center" },
-  achEarned:   { backgroundColor: colors.yellowLight, borderColor: colors.yellowBorder },
-  achLocked:   { backgroundColor: colors.pageBg, borderColor: colors.border },
+  achEarned:   { backgroundColor: "rgba(10,138,122,0.15)", borderColor: colors.blue },
+  achLocked:   { backgroundColor: colors.darkCard, borderColor: "rgba(255,255,255,0.1)" },
   achIcon:     { fontSize: 32 },
-  achTitle:    { ...type_.body, color: colors.textAlt, marginTop: 10, fontFamily: fonts.bold },
-  achSub:      { ...type_.bodySm, textAlign: "center", marginTop: 6 },
+  achTitle:    { ...type_.body, color: "#FFFFFF", marginTop: 10, fontFamily: fonts.bold },
+  achSub:      { ...type_.bodySm, textAlign: "center", marginTop: 6, color: "rgba(255,255,255,0.6)" },
   earnedPill:  { marginTop: 10, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 5 },
-  earnedOn:    { backgroundColor: colors.purpleDark },
+  earnedOn:    { backgroundColor: colors.blue },
   earnedOff:   { backgroundColor: colors.borderMid },
   earnedText:  { fontSize: 11, fontFamily: fonts.extrabold },
   earnedTextOn:{ color: "#FFFFFF" },

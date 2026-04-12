@@ -36,7 +36,10 @@ CLAUDE.md
 start-dev.sh
 
 # Demo/presentation utilities
+backend/scripts/seed_demo_data.py
 backend/scripts/seed_demo_scenarios.py
+backend/scripts/seed_reports.py
+backend/scripts/seed_data_reference.md
 ml-model/src/generate_all_test_sessions.py
 ml-model/src/test_sessions/
 ml-model/src/test_session.json
@@ -65,3 +68,14 @@ ml-model/notebooks/motor_predictions_all_windows.csv
 ml-model/notebooks/secondary_predictions_all_windows.csv
 ml-model/notebooks/motor_window_features_10Hz_KNN_ready.csv
 ml-model/notebooks/secondary_window_features_10Hz_KNN_ready.csv
+
+# Word temp/lock files
+~$*
+
+# Frontend temp/scratch directories
+frontend/temp/
+frontend/website/
+
+# Additional demo/utility scripts
+backend/scripts/generate_routes.py
+backend/scripts/seed_routes.py

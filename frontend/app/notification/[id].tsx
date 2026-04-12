@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { colors, fonts, radius, space } from "../../lib/theme";
 
 const MOCK_NOTIFICATIONS: Record<
   string,
@@ -59,7 +60,7 @@ export default function NotificationDetails() {
       ) : (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Not found</Text>
-          <Text style={styles.body}>This notification ID doesn’t exist in mock data.</Text>
+          <Text style={styles.body}>This notification ID doesn't exist in mock data.</Text>
         </View>
       )}
     </ScrollView>
@@ -67,34 +68,34 @@ export default function NotificationDetails() {
 }
 
 const styles = StyleSheet.create({
-  page: { flex: 1, backgroundColor: "#F5F7FB" },
-  content: { padding: 16, paddingBottom: 28 },
+  page: { flex: 1, backgroundColor: colors.pageBgAlt },
+  content: { padding: space.lg, paddingBottom: 28 },
 
-  backBtn: { paddingVertical: 6, paddingHorizontal: 4, alignSelf: "flex-start" },
-  backText: { color: "#2563EB", fontWeight: "900", fontSize: 13 },
+  backBtn: { paddingVertical: 6, paddingHorizontal: space.xs, alignSelf: "flex-start" },
+  backText: { color: colors.blue, fontFamily: fonts.extrabold, fontSize: 13 },
 
-  title: { color: "#0B1220", fontWeight: "900", fontSize: 22, marginTop: 8, marginBottom: 12 },
+  title: { color: colors.text, fontFamily: fonts.extrabold, fontSize: 22, marginTop: space.sm, marginBottom: space.md },
 
   card: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.cardBg,
     borderWidth: 1,
-    borderColor: "#EAECF0",
-    borderRadius: 16,
-    padding: 14,
+    borderColor: colors.border,
+    borderRadius: radius.card,
+    padding: space.lg,
   },
-  cardTitle: { color: "#101828", fontWeight: "900", fontSize: 14 },
-  time: { color: "#667085", fontWeight: "700", fontSize: 12, marginTop: 6 },
+  cardTitle: { color: colors.textAlt, fontFamily: fonts.extrabold, fontSize: 14 },
+  time: { color: colors.subtextAlt, fontFamily: fonts.bold, fontSize: 12, marginTop: 6 },
 
-  divider: { height: 1, backgroundColor: "#F2F4F7", marginVertical: 12 },
+  divider: { height: 1, backgroundColor: colors.borderLight, marginVertical: space.md },
 
-  body: { color: "#0F172A", fontWeight: "700", fontSize: 12, lineHeight: 18 },
+  body: { color: colors.text, fontFamily: fonts.bold, fontSize: 12, lineHeight: 18 },
 
   primaryBtn: {
-    marginTop: 14,
-    backgroundColor: "#0B1220",
-    borderRadius: 14,
+    marginTop: space.lg,
+    backgroundColor: colors.blue,
+    borderRadius: radius.input,
     paddingVertical: 12,
     alignItems: "center",
   },
-  primaryText: { color: "#FFFFFF", fontWeight: "900", fontSize: 13 },
+  primaryText: { color: "#FFFFFF", fontFamily: fonts.extrabold, fontSize: 13 },
 });

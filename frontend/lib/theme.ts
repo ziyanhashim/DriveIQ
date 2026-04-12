@@ -54,12 +54,12 @@ export const colors = {
   inputBg:        "#F9FAFB",
 
   // ── Dark theme (instructor home, lesson)
-  darkBg:         "#0B1220",
-  darkCard:       "#111B2E",
+  darkBg:         "#0D1B35",
+  darkCard:       "#12243E",
   darkBorder:     "#1E2A44",
   darkText:       "#E5E7EB",
   darkSubtext:    "#9AA7BF",
-  darkAccent:     "#38BDF8",
+  darkAccent:     "#0A8A7A",
 
   // ── Text
   text:           "#0F172A",
@@ -70,27 +70,27 @@ export const colors = {
   label:          "#344054",
   placeholder:    "#98A2B3",
 
-  // ── Brand blue
-  blue:           "#2563EB",
-  blueDark:       "#1D4ED8",
-  blueDeep:       "#1E40AF",
-  blueLight:      "#EEF6FF",
-  blueLighter:    "#DBEAFE",
-  blueBorder:     "#BFDBFE",
-  blueChip:       "#BBD3FF",
-  blueNote:       "#EDF5FF",
-  blueNoteBorder: "#BBD7FF",
+  // ── Brand teal (primary action color)
+  blue:           "#0A8A7A",
+  blueDark:       "#07705F",
+  blueDeep:       "#065E50",
+  blueLight:      "#ECFDF8",
+  blueLighter:    "#D1FAE5",
+  blueBorder:     "#A7F3D0",
+  blueChip:       "#B2F5EA",
+  blueNote:       "#ECFDF8",
+  blueNoteBorder: "#A7F3D0",
 
-  // ── Purple (hero, spinner, active badges, AI feedback %)
-  purple:         "#7C3AED",
-  purpleDark:     "#6D28D9",
-  purpleDeep:     "#5B21B6",
-  purpleLight:    "#F5F3FF",
-  purpleLighter:  "#F4EFFF",
-  purpleBorder:   "#DDD6FE",
-  purpleBorderAlt:"#D6C6FF",
-  purpleChip:     "#E5EDFF",
-  avatarPurple:   "#6D67FF",
+  // ── Navy (hero, accents, depth)
+  purple:         "#0D1B35",
+  purpleDark:     "#0D1B35",
+  purpleDeep:     "#06101D",
+  purpleLight:    "#F0F4FA",
+  purpleLighter:  "#E8EEF6",
+  purpleBorder:   "#C7D2E0",
+  purpleBorderAlt:"#B8C5D6",
+  purpleChip:     "#E2EAF2",
+  avatarPurple:   "#1A2F55",
 
   // ── Green (success, completed, earned)
   green:          "#16A34A",
@@ -141,15 +141,24 @@ export const colors = {
   disabledBorder: "#E5E7EB",
 
   // ── Primary dark button
-  darkBtn:        "#0B1220",
+  darkBtn:        "#0D1B35",
 
   // ── Toast / overlay
   toast:          "#1F2937",
 
-  // ── Indigo (sessions avatar, chart)
-  indigo:         "#4F46E5",
-  indigoBg:       "#EEF2FF",
-  indigoBorder:   "#C7D2FE",
+  // ── Indigo / teal (sessions avatar, chart)
+  indigo:         "#0A8A7A",
+  indigoBg:       "#ECFDF8",
+  indigoBorder:   "#A7F3D0",
+
+  // ── Auth screens (gradient / frosted glass)
+  authGradientA:  "#0B6A5D",
+  authGradientB:  "#0D1B35",
+  authGradientC:  "#12324D",
+  glassCard:      "rgba(255,255,255,0.9)",
+  glassBorder:    "rgba(255,255,255,0.74)",
+  glassShell:     "rgba(255,255,255,0.08)",
+  glassShellBorder: "rgba(255,255,255,0.12)",
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -208,7 +217,7 @@ export const type_ = StyleSheet.create({
   chip:         { fontFamily: fonts.bold, fontSize: 11, color: colors.text },
 
   // Links
-  link:         { fontFamily: fonts.bold, fontSize: 12, color: colors.blue },
+  link:         { fontFamily: fonts.bold, fontSize: 12, color: "#0A8A7A" },
   linkMuted:    { fontFamily: fonts.semibold, fontSize: 12, color: colors.subtextAlt },
 
   // Meta (dates, IDs, vehicles)
@@ -238,8 +247,8 @@ export const space = {
   xxl:    24,
   xxxl:   32,
   page:   20,
-  card:   16,
-  cardLg: 20,
+  card:   18,
+  cardLg: 22,
   sectionGap: 8,
 };
 
@@ -251,15 +260,17 @@ export const radius = {
   xs:     4,
   sm:     8,
   md:     10,
-  input:  12,
-  btn:    12,
-  card:   14,
-  cardLg: 16,
-  cardXl: 18,
+  input:  14,
+  btn:    14,
+  card:   16,
+  cardLg: 18,
+  cardXl: 22,
   logo:   16,
   tag:    10,
   icon:   12,
   pill:   999,
+  shell:  30,
+  authCard: 28,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -268,27 +279,27 @@ export const radius = {
 
 export const shadow = {
   sm: Platform.select({
-    ios:     { shadowColor: "#000", shadowOpacity: 0.04, shadowRadius: 4,  shadowOffset: { width: 0, height: 1 } },
+    ios:     { shadowColor: "#06101D", shadowOpacity: 0.06, shadowRadius: 6,  shadowOffset: { width: 0, height: 2 } },
     android: { elevation: 1 },
   }),
   navbar: Platform.select({
-    ios:     { shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 8,  shadowOffset: { width: 0, height: 2 } },
+    ios:     { shadowColor: "#06101D", shadowOpacity: 0.08, shadowRadius: 10, shadowOffset: { width: 0, height: 3 } },
     android: { elevation: 3 },
   }),
   card: Platform.select({
-    ios:     { shadowColor: "#101828", shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
-    android: { elevation: 2 },
+    ios:     { shadowColor: "#06101D", shadowOpacity: 0.10, shadowRadius: 14, shadowOffset: { width: 0, height: 4 } },
+    android: { elevation: 3 },
   }),
   cardRaised: Platform.select({
-    ios:     { shadowColor: "#101828", shadowOpacity: 0.12, shadowRadius: 16, shadowOffset: { width: 0, height: 8 } },
+    ios:     { shadowColor: "#06101D", shadowOpacity: 0.14, shadowRadius: 18, shadowOffset: { width: 0, height: 8 } },
     android: { elevation: 4 },
   }),
   dropdown: Platform.select({
-    ios:     { shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 16, shadowOffset: { width: 0, height: 4 } },
+    ios:     { shadowColor: "#06101D", shadowOpacity: 0.14, shadowRadius: 18, shadowOffset: { width: 0, height: 6 } },
     android: { elevation: 8 },
   }),
   modal: Platform.select({
-    ios:     { shadowColor: "#000", shadowOpacity: 0.2,  shadowRadius: 20, shadowOffset: { width: 0, height: 8 } },
+    ios:     { shadowColor: "#06101D", shadowOpacity: 0.22, shadowRadius: 24, shadowOffset: { width: 0, height: 10 } },
     android: { elevation: 12 },
   }),
 } as const;
@@ -364,7 +375,7 @@ export const btn = StyleSheet.create({
     paddingVertical: 14,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.darkBtn,
+    backgroundColor: colors.blue,
   },
   primaryDisabled: { backgroundColor: colors.disabled },
   outline: {
@@ -437,8 +448,8 @@ export const divider = StyleSheet.create({
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const tint = {
-  blue:   { bg: "#EFF6FF",           border: colors.blueLighter,    icon: colors.blue,       text: colors.blueDeep   },
-  purple: { bg: colors.purpleLight,  border: colors.purpleBorder,   icon: colors.purpleDark, text: colors.purpleDeep },
+  blue:   { bg: "#ECFDF8",           border: "#A7F3D0",             icon: "#0A8A7A",         text: "#065E50"         },
+  purple: { bg: "#F0F4FA",           border: "#C7D2E0",             icon: "#0D1B35",         text: "#06101D"         },
   green:  { bg: colors.greenLight,   border: colors.greenBorderAlt, icon: colors.green,      text: colors.greenDark  },
   yellow: { bg: colors.yellowLight,  border: colors.yellowBorder,   icon: colors.yellow,     text: "#854D0E"         },
   red:    { bg: colors.redLight,     border: colors.redBorder,      icon: colors.redDeep,    text: colors.redDark    },

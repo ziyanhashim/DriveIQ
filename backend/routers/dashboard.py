@@ -19,6 +19,48 @@ from app.utils import now_utc, to_jsonable
 router = APIRouter(tags=["Dashboard"])
 
 
+def _refresh_achievements(trainee_id: str, completed_sessions: list) -> list:
+    """Auto-unlock achievements based on real session data."""
+    count = len(completed_sessions)
+    scores = [s.get("performance_score", 0) for s in completed_sessions if s.get("performance_score")]
+    max_score = max(scores) if scores else 0
+    unique_instructors = len(set(
+        s.get("instructor_id") for s in completed_sessions if s.get("instructor_id")
+    ))
+
+    RULES = [
+        ("first_session",   "First Drive",     "Completed your first session",     "\U0001f697", count >= 1),
+        ("five_sessions",   "Road Regular",    "Completed 5 driving sessions",     "\U0001f3c5", count >= 5),
+        ("ten_sessions",    "Driving Veteran", "Complete 10 driving sessions",     "\U0001f3c6", count >= 10),
+        ("score_above_80",  "Safe Driver",     "Scored above 80 in a session",     "\U0001f6e1\ufe0f", max_score >= 80),
+        ("score_above_90",  "Expert Driver",   "Scored above 90 in a session",     "\u2b50",     max_score >= 90),
+        ("perfect_score",   "Flawless",        "Score 100 in a session",           "\U0001f48e", max_score >= 100),
+        ("multi_instructor","Explorer",        "Book with 3+ instructors",         "\U0001f5fa\ufe0f", unique_instructors >= 3),
+    ]
+
+    # Preserve existing earned_at timestamps
+    existing = settings_col.find_one({"user_id": trainee_id}) or {}
+    existing_map = {a["id"]: a for a in existing.get("achievements", [])}
+
+    now_str = now_utc().isoformat()
+    achievements = []
+    for aid, title, subtitle, icon, earned in RULES:
+        entry = {"id": aid, "title": title, "subtitle": subtitle, "icon": icon, "earned": earned}
+        prev = existing_map.get(aid)
+        if earned and prev and prev.get("earned_at"):
+            entry["earned_at"] = prev["earned_at"]
+        elif earned:
+            entry["earned_at"] = now_str
+        achievements.append(entry)
+
+    settings_col.update_one(
+        {"user_id": trainee_id},
+        {"$set": {"achievements": achievements}},
+        upsert=True,
+    )
+    return achievements
+
+
 @router.get("/dashboard/trainee")
 def trainee_dashboard(current_user=Depends(require_role("trainee"))):
     trainee_id = current_user["user_id"]
@@ -76,10 +118,27 @@ def trainee_dashboard(current_user=Depends(require_role("trainee"))):
     recent_reports = []
     for r in recent_results:
         analysis = r.get("analysis") or {}
-        score = analysis.get("overall", 0)
+        score = r.get("performance_score") or analysis.get("overall", 0)
+        score = int(round(score)) if isinstance(score, (int, float)) else 0
         created = r.get("created_at")
         date_label = created.strftime("%b %d, %Y") if hasattr(created, "strftime") else str(created)[:10] if created else "—"
-        inst_name = r.get("instructor_name", "—")
+        inst_name = r.get("instructor_name", "")
+        if not inst_name and r.get("instructor_id"):
+            # Try users collection first
+            inst_user = users_col.find_one(
+                {"instructor_id": r["instructor_id"]}, {"name": 1}
+            )
+            if inst_user:
+                inst_name = inst_user.get("name", "")
+        if not inst_name and r.get("session_id"):
+            # Fallback: get instructor_name from the session document
+            sess_doc = sessions_col.find_one(
+                {"session_id": r["session_id"]}, {"instructor_name": 1}
+            )
+            if sess_doc:
+                inst_name = sess_doc.get("instructor_name", "")
+        if not inst_name:
+            inst_name = "—"
 
         recent_reports.append({
             "id":              str(r.get("_id", "")),
@@ -92,6 +151,7 @@ def trainee_dashboard(current_user=Depends(require_role("trainee"))):
             "score":           {"overall": score},
             "behavior":        analysis.get("behavior", "Unknown"),
             "badge":           analysis.get("badge", "—"),
+            "window_summary":  r.get("window_summary") or r.get("session_summary", {}).get("window_summary"),
         })
 
     summary_feedback = (latest.get("summary_feedback") if latest else None)
@@ -113,15 +173,23 @@ def trainee_dashboard(current_user=Depends(require_role("trainee"))):
     for r in recent_results:
         comment = r.get("instructor_comment")
         if comment and comment.get("text"):
+            # Resolve instructor name: try result doc first, then look up from instructor_id
+            inst_name = r.get("instructor_name", "")
+            if not inst_name and r.get("instructor_id"):
+                inst_user = users_col.find_one(
+                    {"instructor_id": r["instructor_id"]}, {"name": 1}
+                )
+                if inst_user:
+                    inst_name = inst_user.get("name", "")
             instructor_comments.append({
-                "id":     str(r.get("_id", "")),
-                "date":   comment.get("date", ""),
-                "text":   comment["text"],
-                "rating": comment.get("rating", 0),
+                "id":              str(r.get("_id", "")),
+                "instructor_name": inst_name,
+                "date":            comment.get("date", ""),
+                "text":            comment["text"],
+                "rating":          comment.get("rating", 0),
             })
 
-    user_settings = settings_col.find_one({"user_id": trainee_id}) or {}
-    achievements = user_settings.get("achievements", [])
+    achievements = _refresh_achievements(trainee_id, completed_sessions)
 
     completed_count = len(completed_sessions)
     target = 10
@@ -186,7 +254,7 @@ def instructor_dashboard(current_user=Depends(require_role("instructor"))):
     latest_results = list(
         results_col.find({"instructor_id": instructor_id}).sort("created_at", -1).limit(50)
     )
-    scores = [float(r["analysis"]["overall"]) for r in latest_results if r.get("analysis", {}).get("overall")]
+    scores = [float(r.get("performance_score") or r.get("analysis", {}).get("overall", 0)) for r in latest_results if r.get("performance_score") or r.get("analysis", {}).get("overall")]
     avg_score = int(sum(scores) / len(scores)) if scores else 0
 
     upcoming = list(

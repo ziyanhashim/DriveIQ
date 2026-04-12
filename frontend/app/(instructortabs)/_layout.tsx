@@ -1,18 +1,18 @@
 import React, { useState, useEffect } from "react";
 import {
-  View, Text, Pressable, StyleSheet, SafeAreaView, Modal, useWindowDimensions,
+  View, Text, Pressable, StyleSheet, SafeAreaView, Modal, useWindowDimensions, Image,
 } from "react-native";
 import { router, usePathname, Slot } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { clearToken } from "../../lib/token";
-import { colors, type_, radius, space, shadow } from "../../lib/theme";
+import { colors, type_, radius, space, shadow, fonts } from "../../lib/theme";
 import InstructorSidebar from "../../components/InstructorSidebar";
 
 const TABS = [
-  { name: "dashboard", label: "Dashboard", icon: "⊞" },
-  { name: "sessions",  label: "Sessions",  icon: "◷" },
-  { name: "records",   label: "Reports",    icon: "📄" },
-  { name: "settings",  label: "Settings",  icon: "⚙" },
+  { name: "dashboard", label: "Dashboard" },
+  { name: "sessions",  label: "Sessions" },
+  { name: "records",   label: "Reports" },
+  { name: "settings",  label: "Settings" },
 ] as const;
 
 type TabName = typeof TABS[number]["name"];
@@ -51,7 +51,7 @@ export default function InstructorTabsLayout() {
       <View style={s.navbar}>
         {/* Logo */}
         <Pressable onPress={() => navigate("dashboard")} style={s.logoWrap}>
-          <View style={s.logoBox}><Text style={s.logoText}>DI</Text></View>
+          <Image source={require("../../assets/drive-iq-logo.png")} style={s.logoImg} />
           <Text style={s.logoLabel}>DriveIQ</Text>
         </Pressable>
 
@@ -62,7 +62,6 @@ export default function InstructorTabsLayout() {
             return (
               <Pressable key={tab.name} onPress={() => navigate(tab.name)}
                 style={({ pressed }) => [s.tab, active && s.tabActive, pressed && s.tabPressed]}>
-                <Text style={[s.tabIcon, active && s.tabIconActive]}>{tab.icon}</Text>
                 <Text style={[s.tabLabel, active && s.tabLabelActive]}>{tab.label}</Text>
               </Pressable>
             );
@@ -121,7 +120,6 @@ export default function InstructorTabsLayout() {
               return (
                 <Pressable key={tab.name} onPress={() => navigate(tab.name)}
                   style={[s.mobileItem, active && s.mobileItemActive]}>
-                  <Text style={s.mobileIcon}>{tab.icon}</Text>
                   <Text style={[s.mobileLabel, active && s.mobileLabelActive]}>{tab.label}</Text>
                 </Pressable>
               );
@@ -143,9 +141,8 @@ const s = StyleSheet.create({
 
   navbar: {
     height: NAV_HEIGHT,
-    backgroundColor: colors.cardBg,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderFaint,
+    backgroundColor: colors.darkBg,
+    borderBottomWidth: 0,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: space.lg,
@@ -156,40 +153,37 @@ const s = StyleSheet.create({
   },
 
   // Logo
-  logoWrap:  { flexDirection: "row", alignItems: "center", gap: space.sm, marginRight: space.sm },
-  logoBox:   { width: 32, height: 32, borderRadius: radius.sm, backgroundColor: colors.blue, alignItems: "center", justifyContent: "center" },
-  logoText:  { color: "#FFFFFF", fontWeight: "900", fontSize: 13 },
-  logoLabel: { color: colors.blue, fontWeight: "900", fontSize: 15 },
+  logoWrap:  { flexDirection: "row", alignItems: "center", gap: space.sm, marginRight: space.md },
+  logoImg:   { width: 46, height: 46, resizeMode: "contain" },
+  logoLabel: { color: "#FFFFFF", fontFamily: fonts.extrabold, fontSize: 15, letterSpacing: -0.3 },
 
   // Tabs
-  tabsRow:        { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 2 },
-  tab:            { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: space.md, paddingVertical: space.sm, borderRadius: radius.sm },
-  tabActive:      { backgroundColor: colors.darkBtn },
+  tabsRow:        { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 },
+  tab:            { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: space.md, paddingVertical: 7, borderRadius: radius.sm },
+  tabActive:      {},
   tabPressed:     { opacity: 0.7 },
-  tabIcon:        { fontSize: 14, color: colors.subtext },
-  tabIconActive:  { color: "#FFFFFF" },
-  tabLabel:       { fontSize: 13, fontWeight: "700", color: "#374151", userSelect: "none" },
-  tabLabelActive: { color: "#FFFFFF", fontWeight: "700", fontSize: 13, userSelect: "none" },
+  tabLabel:       { fontSize: 13, fontFamily: fonts.semibold, color: "rgba(255,255,255,0.5)", userSelect: "none" },
+  tabLabelActive: { color: colors.blue, fontFamily: fonts.bold, fontSize: 13, userSelect: "none" },
 
   // User pill
   userWrap:   { flexDirection: "row", alignItems: "center", gap: space.sm, paddingHorizontal: space.sm, paddingVertical: 6, borderRadius: radius.sm },
-  avatar:     { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.purpleDark, alignItems: "center", justifyContent: "center" },
-  avatarText: { color: "#FFFFFF", fontWeight: "900", fontSize: 13 },
-  userName:   { fontSize: 13, fontWeight: "700", color: colors.textAlt },
-  chevron:    { fontSize: 12, color: colors.subtext },
+  avatar:     { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.blue, alignItems: "center", justifyContent: "center" },
+  avatarText: { color: "#FFFFFF", fontFamily: fonts.bold, fontSize: 12 },
+  userName:   { fontSize: 13, fontFamily: fonts.semibold, color: "rgba(255,255,255,0.85)" },
+  chevron:    { fontSize: 12, color: "rgba(255,255,255,0.5)" },
 
   // Hamburger
   hamburger:     { padding: space.sm, gap: 4, display: "none" },
-  hamburgerLine: { width: 20, height: 2, backgroundColor: "#374151", borderRadius: 2 },
+  hamburgerLine: { width: 20, height: 2, backgroundColor: "rgba(255,255,255,0.5)", borderRadius: 2 },
 
   // Mobile modal
   overlay:          { flex: 1, backgroundColor: "rgba(0,0,0,0.3)", justifyContent: "flex-start", alignItems: "flex-end", paddingTop: NAV_HEIGHT + 8, paddingRight: space.lg },
-  mobileMenu:       { backgroundColor: colors.cardBg, borderRadius: radius.input, borderWidth: 1, borderColor: colors.borderFaint, minWidth: 180, overflow: "hidden", ...shadow.dropdown },
-  mobileItem:       { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: space.lg, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.borderFaint },
-  mobileItemActive: { backgroundColor: colors.purpleLight },
+  mobileMenu:       { backgroundColor: colors.cardBg, borderRadius: radius.card, borderWidth: 1, borderColor: colors.border, minWidth: 200, overflow: "hidden", ...shadow.dropdown },
+  mobileItem:       { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: space.xl, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: colors.borderFaint },
+  mobileItemActive: { backgroundColor: colors.blueLight },
   mobileIcon:       { fontSize: 16, color: colors.subtext },
-  mobileLabel:      { fontSize: 14, fontWeight: "700", color: "#374151", userSelect: "none" },
-  mobileLabelActive:{ color: colors.purpleDark, userSelect: "none" },
+  mobileLabel:      { fontSize: 14, fontFamily: fonts.semibold, color: colors.label, userSelect: "none" },
+  mobileLabelActive:{ color: colors.blue, fontFamily: fonts.bold, userSelect: "none" },
 
   // Body + sidebar
   body:    { flex: 1, flexDirection: "row", overflow: "visible" },
@@ -197,10 +191,10 @@ const s = StyleSheet.create({
   sidebar: { width: 320, backgroundColor: colors.cardBg, borderLeftWidth: 1, borderLeftColor: colors.borderFaint },
 
   // User dropdown
-  userDropdown: { position: "absolute", top: 44, right: 0, backgroundColor: colors.cardBg, borderRadius: radius.input, borderWidth: 1, borderColor: colors.borderFaint, minWidth: 180, zIndex: 999, ...shadow.dropdown },
-  ddItem:       { paddingHorizontal: space.lg, paddingVertical: 13 },
+  userDropdown: { position: "absolute", top: 44, right: 0, backgroundColor: colors.cardBg, borderRadius: radius.card, borderWidth: 1, borderColor: colors.border, minWidth: 200, zIndex: 999, ...shadow.dropdown },
+  ddItem:       { paddingHorizontal: space.xl, paddingVertical: 13 },
   ddItemBorder: { borderBottomWidth: 1, borderBottomColor: colors.borderFaint },
-  ddText:       { fontSize: 14, fontWeight: "700", color: "#374151" },
+  ddText:       { fontSize: 14, fontFamily: fonts.semibold, color: colors.label },
   ddSignOut:    { marginTop: 2 },
-  ddSignOutText:{ color: colors.redDark, fontWeight: "800" },
+  ddSignOutText:{ color: colors.redDark, fontFamily: fonts.bold },
 });

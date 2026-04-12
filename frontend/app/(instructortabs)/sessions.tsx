@@ -110,13 +110,13 @@ function pillFor(status: SessionStatus) {
     case "confirmed":
       return { bg: "#2563EB", text: "#fff", label: "Booked" };
     case "active":
-      return { bg: "#16A34A", text: "#fff", label: "Active" };
+      return { bg: colors.green, text: "#fff", label: "Active" };
     case "completed":
-      return { bg: "#0B1220", text: "#fff", label: "Completed" };
+      return { bg: colors.blue, text: "#fff", label: "Completed" };
     case "cancelled":
-      return { bg: "#E11D48", text: "#fff", label: "Cancelled" };
+      return { bg: colors.redDeep, text: "#fff", label: "Cancelled" };
     default:
-      return { bg: "#EEF2F6", text: "#101828", label: "Scheduled" };
+      return { bg: colors.borderLight, text: colors.textAlt, label: "Scheduled" };
   }
 }
 
@@ -624,8 +624,8 @@ export default function SessionsScreen() {
           <Text style={styles.muted}>No active session</Text>
         ) : !activeSession && simLoading ? (
           <View style={{ alignItems: "center", paddingVertical: 24 }}>
-            <ActivityIndicator size="large" color="#7C3AED" />
-            <Text style={{ marginTop: 12, color: "#7C3AED", fontWeight: "900", fontSize: 13 }}>
+            <ActivityIndicator size="large" color={colors.blue} />
+            <Text style={{ marginTop: 12, color: colors.blue, fontFamily: fonts.extrabold, fontSize: 13 }}>
               Starting session...
             </Text>
           </View>
@@ -657,11 +657,11 @@ export default function SessionsScreen() {
               {/* Simulation loading state */}
               {simLoading && (
                 <View style={{ alignItems: "center", paddingVertical: 24 }}>
-                  <ActivityIndicator size="large" color="#7C3AED" />
-                  <Text style={{ marginTop: 12, color: "#7C3AED", fontWeight: "900", fontSize: 13 }}>
+                  <ActivityIndicator size="large" color={colors.blue} />
+                  <Text style={{ marginTop: 12, color: colors.blue, fontFamily: fonts.extrabold, fontSize: 13 }}>
                     Analyzing driving data...
                   </Text>
-                  <Text style={{ marginTop: 4, color: "#98A2B3", fontWeight: "700", fontSize: 11 }}>
+                  <Text style={{ marginTop: 4, color: colors.muted, fontFamily: fonts.bold, fontSize: 11 }}>
                     Running ML pipeline and generating AI feedback
                   </Text>
                 </View>
@@ -673,12 +673,12 @@ export default function SessionsScreen() {
                   {/* Progress bar */}
                   <View style={{ marginBottom: 10 }}>
                     <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
-                      <Text style={{ color: "#101828", fontWeight: "900", fontSize: 12 }}>
+                      <Text style={{ color: colors.textAlt, fontFamily: fonts.extrabold, fontSize: 12 }}>
                         {simRevealed < simWindows.length
                           ? `Window ${simRevealed + 1} — Analyzing...`
                           : `Session analysis complete`}
                       </Text>
-                      <Text style={{ color: "#667085", fontWeight: "800", fontSize: 11 }}>
+                      <Text style={{ color: colors.subtextAlt, fontFamily: fonts.bold, fontSize: 11 }}>
                         {simRevealed} windows processed
                       </Text>
                     </View>
@@ -686,59 +686,59 @@ export default function SessionsScreen() {
 
                   {/* Running stats */}
                   <View style={{ flexDirection: "row", gap: 8, marginBottom: 10 }}>
-                    <View style={{ flex: 1, backgroundColor: "#F0FDF4", borderRadius: 10, padding: 8, alignItems: "center" }}>
-                      <Text style={{ fontSize: 18, fontWeight: "900", color: "#16A34A" }}>{normalCount}</Text>
-                      <Text style={{ fontSize: 10, fontWeight: "800", color: "#16A34A" }}>Normal</Text>
+                    <View style={{ flex: 1, backgroundColor: colors.greenLighter, borderRadius: radius.md, padding: 8, alignItems: "center" }}>
+                      <Text style={{ fontSize: 18, fontFamily: fonts.extrabold, color: colors.green }}>{normalCount}</Text>
+                      <Text style={{ fontSize: 10, fontFamily: fonts.bold, color: colors.green }}>Normal</Text>
                     </View>
-                    <View style={{ flex: 1, backgroundColor: "#FEF2F2", borderRadius: 10, padding: 8, alignItems: "center" }}>
-                      <Text style={{ fontSize: 18, fontWeight: "900", color: "#DC2626" }}>{aggressiveCount}</Text>
-                      <Text style={{ fontSize: 10, fontWeight: "800", color: "#DC2626" }}>Aggressive</Text>
+                    <View style={{ flex: 1, backgroundColor: colors.redLight, borderRadius: radius.md, padding: 8, alignItems: "center" }}>
+                      <Text style={{ fontSize: 18, fontFamily: fonts.extrabold, color: colors.redDark }}>{aggressiveCount}</Text>
+                      <Text style={{ fontSize: 10, fontFamily: fonts.bold, color: colors.redDark }}>Aggressive</Text>
                     </View>
-                    <View style={{ flex: 1, backgroundColor: "#FFFBEB", borderRadius: 10, padding: 8, alignItems: "center" }}>
-                      <Text style={{ fontSize: 18, fontWeight: "900", color: "#D97706" }}>{drowsyCount}</Text>
-                      <Text style={{ fontSize: 10, fontWeight: "800", color: "#D97706" }}>Drowsy</Text>
+                    <View style={{ flex: 1, backgroundColor: colors.yellowLight, borderRadius: radius.md, padding: 8, alignItems: "center" }}>
+                      <Text style={{ fontSize: 18, fontFamily: fonts.extrabold, color: colors.amber }}>{drowsyCount}</Text>
+                      <Text style={{ fontSize: 10, fontFamily: fonts.bold, color: colors.amber }}>Drowsy</Text>
                     </View>
                   </View>
 
                   {/* Window feed — show last 4 revealed windows */}
                   {revealedWindows.slice(-4).reverse().map((w: any, idx: number) => {
                     const isNewest = idx === 0;
-                    const labelColor = w.predicted_label === "Normal" ? "#16A34A"
-                      : w.predicted_label === "Aggressive" ? "#DC2626" : "#D97706";
-                    const labelBg = w.predicted_label === "Normal" ? "#F0FDF4"
-                      : w.predicted_label === "Aggressive" ? "#FEF2F2" : "#FFFBEB";
+                    const labelColor = w.predicted_label === "Normal" ? colors.green
+                      : w.predicted_label === "Aggressive" ? colors.redDark : colors.amber;
+                    const labelBg = w.predicted_label === "Normal" ? colors.greenLighter
+                      : w.predicted_label === "Aggressive" ? colors.redLight : colors.yellowLight;
                     return (
                       <View key={w.window_id} style={{
                         marginBottom: 8,
-                        backgroundColor: "#FFFFFF",
+                        backgroundColor: colors.cardBg,
                         borderWidth: 1,
-                        borderColor: isNewest ? labelColor : "#EAECF0",
-                        borderRadius: 12,
+                        borderColor: isNewest ? labelColor : colors.border,
+                        borderRadius: radius.icon,
                         padding: 10,
                         opacity: isNewest ? 1 : 0.7,
                       }}>
                         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                          <Text style={{ color: "#101828", fontWeight: "900", fontSize: 12 }}>
+                          <Text style={{ color: colors.textAlt, fontFamily: fonts.extrabold, fontSize: 12 }}>
                             Window {w.window_id + 1}
                           </Text>
-                          <View style={{ backgroundColor: labelBg, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 }}>
-                            <Text style={{ color: labelColor, fontWeight: "900", fontSize: 10 }}>
+                          <View style={{ backgroundColor: labelBg, borderRadius: radius.xs, paddingHorizontal: 8, paddingVertical: 2 }}>
+                            <Text style={{ color: labelColor, fontFamily: fonts.extrabold, fontSize: 10 }}>
                               {w.predicted_label}
                             </Text>
                           </View>
                           {w.alert_cause && w.alert_cause !== "No alert" && w.alert_cause !== "None" && (
-                            <Text style={{ color: "#98A2B3", fontWeight: "700", fontSize: 10 }}>
+                            <Text style={{ color: colors.muted, fontFamily: fonts.bold, fontSize: 10 }}>
                               {w.alert_cause}
                             </Text>
                           )}
                           {w.severity > 0 && (
-                            <Text style={{ color: "#98A2B3", fontWeight: "700", fontSize: 10, marginLeft: "auto" }}>
+                            <Text style={{ color: colors.muted, fontFamily: fonts.bold, fontSize: 10, marginLeft: "auto" }}>
                               Severity: {Math.round(w.severity)}
                             </Text>
                           )}
                         </View>
                         {w.feedback && isNewest && (
-                          <Text style={{ marginTop: 6, color: "#667085", fontWeight: "700", fontSize: 11, lineHeight: 16 }}>
+                          <Text style={{ marginTop: 6, color: colors.subtextAlt, fontFamily: fonts.bold, fontSize: 11, lineHeight: 16 }}>
                             {w.feedback}
                           </Text>
                         )}
@@ -786,7 +786,7 @@ export default function SessionsScreen() {
             value={query}
             onChangeText={setQuery}
             placeholder="Search by trainee name…"
-            placeholderTextColor="#98A2B3"
+            placeholderTextColor={colors.placeholder}
             style={styles.searchInput}
           />
         </View>
@@ -1010,7 +1010,7 @@ export default function SessionsScreen() {
               multiline
               numberOfLines={5}
               placeholder="Add your feedback and suggestions for the student…"
-              placeholderTextColor="#98A2B3"
+              placeholderTextColor={colors.placeholder}
               style={styles.modalTextInput}
             />
 
@@ -1047,7 +1047,7 @@ export default function SessionsScreen() {
         >
           <Pressable style={[styles.modalCard, { gap: 12 }]} onPress={(e) => e.stopPropagation()}>
             <Text style={styles.modalTitle}>Select Road Type</Text>
-            <Text style={{ color: "#667085", fontWeight: "700", fontSize: 13 }}>
+            <Text style={{ color: colors.subtextAlt, fontFamily: fonts.bold, fontSize: 13 }}>
               What type of road is this session on?
             </Text>
             <Pressable
@@ -1066,7 +1066,7 @@ export default function SessionsScreen() {
                 setRoadTypePickerId(null);
                 startSession(id, "Secondary");
               }}
-              style={({ pressed }) => [styles.detailActionBtn, { backgroundColor: "#2563EB" }, pressed && { opacity: 0.9 }]}
+              style={({ pressed }) => [styles.detailActionBtn, { backgroundColor: colors.blueDark }, pressed && { opacity: 0.9 }]}
             >
               <Text style={styles.actionBtnText}>Secondary</Text>
             </Pressable>
@@ -1177,8 +1177,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   sessionTop: { flexDirection: "row", alignItems: "center", gap: 12 },
-  avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: tint.purple.bg, alignItems: "center", justifyContent: "center" },
-  avatarText: { color: colors.purpleDark, fontFamily: fonts.extrabold, fontSize: 12 },
+  avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: tint.blue.bg, alignItems: "center", justifyContent: "center" },
+  avatarText: { color: colors.blue, fontFamily: fonts.extrabold, fontSize: 12 },
   nameRow: { flexDirection: "row", alignItems: "center", gap: 10, flexWrap: "wrap" },
   studentName: { color: colors.textAlt, fontFamily: fonts.bold, fontSize: 14 },
   subLine: { marginTop: 4, color: colors.subtext, fontFamily: fonts.medium, fontSize: 12 },
@@ -1195,7 +1195,7 @@ const styles = StyleSheet.create({
   actionsRow: { flexDirection: "row", gap: 10, flexWrap: "wrap" },
   actionBtn: {
     minHeight: 44, paddingHorizontal: 16, borderRadius: radius.input,
-    backgroundColor: colors.darkBtn, alignItems: "center", justifyContent: "center",
+    backgroundColor: colors.blue, alignItems: "center", justifyContent: "center",
   },
   actionBtnEnd: {
     minHeight: 44, paddingHorizontal: 16, borderRadius: radius.input,
@@ -1208,7 +1208,7 @@ const styles = StyleSheet.create({
   },
   actionBtnGenerate: {
     minHeight: 44, paddingHorizontal: 16, borderRadius: radius.input,
-    backgroundColor: colors.purpleDark, alignItems: "center", justifyContent: "center",
+    backgroundColor: colors.blue, alignItems: "center", justifyContent: "center",
   },
   actionBtnText: { color: "#fff", fontFamily: fonts.extrabold, fontSize: 13 },
   actionBtnOutlineText: { color: colors.textAlt, fontFamily: fonts.extrabold, fontSize: 13 },
@@ -1216,7 +1216,7 @@ const styles = StyleSheet.create({
 
   scoreRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   scoreBig: { fontSize: 44, fontFamily: fonts.extrabold, color: colors.textAlt },
-  badge: { backgroundColor: colors.darkBtn, borderRadius: radius.pill, paddingHorizontal: 14, paddingVertical: 8 },
+  badge: { backgroundColor: colors.blue, borderRadius: radius.pill, paddingHorizontal: 14, paddingVertical: 8 },
   badgeText: { color: "#fff", fontFamily: fonts.extrabold, fontSize: 12 },
 
   feedbackBox: { marginTop: 10, backgroundColor: colors.pageBg, borderWidth: 1, borderColor: colors.border, borderRadius: radius.card, padding: space.md },
@@ -1231,7 +1231,7 @@ const styles = StyleSheet.create({
   notesSection: { marginTop: 14, backgroundColor: colors.pageBg, borderWidth: 1, borderColor: colors.border, borderRadius: radius.card, padding: space.md },
   notesSectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
   notesSectionTitle: { color: colors.textAlt, fontFamily: fonts.extrabold, fontSize: 13 },
-  editLink: { color: colors.purpleDark, fontFamily: fonts.extrabold, fontSize: 12 },
+  editLink: { color: colors.blue, fontFamily: fonts.extrabold, fontSize: 12 },
   notesText: { color: colors.subtext, fontFamily: fonts.medium, fontSize: 13, lineHeight: 20 },
   notesInput: {
     minHeight: 80, borderRadius: radius.input, borderWidth: 1, borderColor: colors.border,
@@ -1245,7 +1245,7 @@ const styles = StyleSheet.create({
   cancelNoteBtnText: { color: colors.subtext, fontFamily: fonts.extrabold, fontSize: 12 },
   saveNoteBtn: {
     flex: 1, minHeight: 40, borderRadius: radius.input,
-    backgroundColor: colors.purpleDark, alignItems: "center", justifyContent: "center",
+    backgroundColor: colors.blue, alignItems: "center", justifyContent: "center",
   },
   saveNoteBtnText: { color: "#fff", fontFamily: fonts.extrabold, fontSize: 12 },
 
@@ -1266,9 +1266,9 @@ const styles = StyleSheet.create({
   detailHeader: { flexDirection: "row", alignItems: "center", gap: 14 },
   detailAvatarLg: {
     width: 54, height: 54, borderRadius: 27,
-    backgroundColor: tint.purple.bg, alignItems: "center", justifyContent: "center",
+    backgroundColor: tint.blue.bg, alignItems: "center", justifyContent: "center",
   },
-  detailAvatarText: { color: colors.purpleDark, fontFamily: fonts.extrabold, fontSize: 16 },
+  detailAvatarText: { color: colors.blue, fontFamily: fonts.extrabold, fontSize: 16 },
   detailName: { color: colors.textAlt, fontFamily: fonts.extrabold, fontSize: 16 },
   detailCloseBtn: {
     width: 32, height: 32, borderRadius: 16,
@@ -1283,7 +1283,7 @@ const styles = StyleSheet.create({
   detailActions: { flexDirection: "column", gap: 10 },
   detailActionBtn: {
     minHeight: 48, borderRadius: radius.card,
-    backgroundColor: colors.darkBtn, alignItems: "center", justifyContent: "center",
+    backgroundColor: colors.blue, alignItems: "center", justifyContent: "center",
   },
   detailActionBtnEnd: {
     minHeight: 48, borderRadius: radius.card,
@@ -1296,7 +1296,7 @@ const styles = StyleSheet.create({
   },
   detailActionBtnGenerate: {
     minHeight: 48, borderRadius: radius.card,
-    backgroundColor: colors.purpleDark, alignItems: "center", justifyContent: "center",
+    backgroundColor: colors.blue, alignItems: "center", justifyContent: "center",
   },
 
   // Modals
@@ -1325,7 +1325,7 @@ const styles = StyleSheet.create({
   modalSkipText: { color: colors.subtext, fontFamily: fonts.extrabold, fontSize: 13 },
   modalGenerateBtn: {
     flex: 2, minHeight: 50, borderRadius: radius.card,
-    backgroundColor: colors.purpleDark, alignItems: "center", justifyContent: "center",
+    backgroundColor: colors.blue, alignItems: "center", justifyContent: "center",
   },
   modalGenerateBtnText: { color: "#fff", fontFamily: fonts.extrabold, fontSize: 13 },
 });

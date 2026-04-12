@@ -43,7 +43,7 @@ function AccordionRow({
       style={({ pressed }) => [ss.accordionRow, pressed && { opacity: 0.85 }]}
     >
       <View style={ss.accordionLeft}>
-        <Ionicons name={icon as any} size={18} color={colors.purpleDark} />
+        <Ionicons name={icon as any} size={18} color={colors.blue} />
         <Text style={ss.accordionTitle}>{title}</Text>
       </View>
       <Ionicons
@@ -121,8 +121,8 @@ function ToggleRow({
       <Switch
         value={value}
         onValueChange={onChange}
-        trackColor={{ false: colors.border, true: colors.purpleDark }}
-        thumbColor="#FFFFFF"
+        trackColor={{ false: "#D0D5DD", true: "#0A8A7A" }}
+        thumbColor={colors.cardBg}
       />
     </View>
   );
@@ -143,6 +143,7 @@ export default function SettingsScreen() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail]       = useState("");
   const [mobile, setMobile]     = useState("");
+  const [userRole, setUserRole] = useState("");
 
   // ── Password modal
   const [pwdModalOpen, setPwdModalOpen]       = useState(false);
@@ -187,6 +188,7 @@ export default function SettingsScreen() {
       const [me, s] = await Promise.all([apiGet("/auth/me"), apiGet("/settings/me")]);
       setFullName(me?.name || "");
       setEmail(me?.email || "");
+      setUserRole(me?.role || "instructor");
       const profile = s?.profile || {};
       const prefs   = s?.preferences || {};
       const notifs  = s?.notifications || {};
@@ -300,7 +302,7 @@ export default function SettingsScreen() {
   if (loading) {
     return (
       <View style={page.center}>
-        <ActivityIndicator size="large" color={colors.purpleDark} />
+        <ActivityIndicator size="large" color={colors.blue} />
         <Text style={page.centerText}>Loading settings…</Text>
       </View>
     );
@@ -430,7 +432,7 @@ export default function SettingsScreen() {
                   ]}
                 >
                   {saving
-                    ? <ActivityIndicator size="small" color="#FFFFFF" />
+                    ? <ActivityIndicator size="small" color={colors.cardBg} />
                     : <Text style={ss.saveBtnText}>Save Settings</Text>
                   }
                 </Pressable>
@@ -482,7 +484,7 @@ export default function SettingsScreen() {
                   ]}
                 >
                   {saving
-                    ? <ActivityIndicator size="small" color="#FFFFFF" />
+                    ? <ActivityIndicator size="small" color={colors.cardBg} />
                     : <Text style={ss.saveBtnText}>Save Preferences</Text>
                   }
                 </Pressable>
@@ -503,7 +505,7 @@ export default function SettingsScreen() {
           {open.availability && (
             <View style={ss.sectionBody}>
               <View style={ss.infoBox}>
-                <Ionicons name="information-circle-outline" size={18} color={colors.purpleDark} />
+                <Ionicons name="information-circle-outline" size={18} color={colors.blue} />
                 <Text style={ss.infoText}>
                   Manage your available time slots so students can book sessions with you.
                   Add new slots from the Sessions page, or contact your administrator
@@ -515,9 +517,9 @@ export default function SettingsScreen() {
                 onPress={() => router.push("/(instructortabs)/sessions" as any)}
                 style={({ pressed }) => [ss.linkBtn, pressed && { opacity: 0.85 }]}
               >
-                <Ionicons name="calendar-outline" size={16} color={colors.purpleDark} />
+                <Ionicons name="calendar-outline" size={16} color={colors.blue} />
                 <Text style={ss.linkBtnText}>Manage Availability in Sessions</Text>
-                <Ionicons name="chevron-forward" size={14} color={colors.purpleDark} />
+                <Ionicons name="chevron-forward" size={14} color={colors.blue} />
               </Pressable>
             </View>
           )}
@@ -548,7 +550,7 @@ export default function SettingsScreen() {
               </View>
               <View style={ss.metaRow}>
                 <Text style={ss.metaLabel}>Role</Text>
-                <Text style={ss.metaValue}>Instructor</Text>
+                <Text style={ss.metaValue}>{userRole.charAt(0).toUpperCase() + userRole.slice(1)}</Text>
               </View>
             </View>
           )}
@@ -557,18 +559,18 @@ export default function SettingsScreen() {
         {/* ── Clear Session History ─────────────────────────────────────────── */}
         <Pressable
           onPress={() => {
-            const ok = window?.confirm?.("This will remove recent session data. Are you sure?") ?? true;
+            const ok = window?.confirm?.("This will clear all demo sessions, bookings, and availability slots. Are you sure?") ?? true;
             if (!ok) return;
             apiDelete("/sessions/clear-demo").then(() => {
-              Alert.alert("Done", "Session history cleared.");
+              Alert.alert("Done", "Sessions, bookings, and slots cleared.");
             }).catch(() => {
-              Alert.alert("Error", "Failed to clear session history.");
+              Alert.alert("Error", "Failed to clear demo data.");
             });
           }}
-          style={({ pressed }) => [ss.logoutBtn, { backgroundColor: "#DC2626" }, pressed && { opacity: 0.85 }]}
+          style={({ pressed }) => [ss.logoutBtn, { backgroundColor: colors.redDark }, pressed && { opacity: 0.85 }]}
         >
-          <Ionicons name="trash-outline" size={18} color="#FFFFFF" />
-          <Text style={ss.logoutText}>Clear Session History</Text>
+          <Ionicons name="trash-outline" size={18} color={colors.cardBg} />
+          <Text style={ss.logoutText}>Clear Demo Data</Text>
         </Pressable>
 
         {/* ── Logout ───────────────────────────────────────────────────────── */}
@@ -576,7 +578,7 @@ export default function SettingsScreen() {
           onPress={handleLogout}
           style={({ pressed }) => [ss.logoutBtn, pressed && { opacity: 0.85 }]}
         >
-          <Ionicons name="log-out-outline" size={18} color="#FFFFFF" />
+          <Ionicons name="log-out-outline" size={18} color={colors.cardBg} />
           <Text style={ss.logoutText}>Log Out</Text>
         </Pressable>
 
@@ -593,7 +595,7 @@ export default function SettingsScreen() {
             {/* Header */}
             <View style={ss.modalHeader}>
               <View style={ss.modalIconWrap}>
-                <Ionicons name="lock-closed-outline" size={20} color={colors.purpleDark} />
+                <Ionicons name="lock-closed-outline" size={20} color={colors.blue} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={ss.modalTitle}>Change Password</Text>
@@ -683,7 +685,7 @@ export default function SettingsScreen() {
                 disabled={pwdLoading}
               >
                 {pwdLoading
-                  ? <ActivityIndicator color="#fff" size="small" />
+                  ? <ActivityIndicator color={colors.cardBg} size="small" />
                   : <Text style={ss.modalSaveText}>Update Password</Text>
                 }
               </Pressable>
@@ -732,11 +734,11 @@ const ss = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: "#EDE9FE",
+    backgroundColor: colors.blueLight,
     alignItems: "center",
     justifyContent: "center",
   },
-  avatarText: { fontSize: 20, fontFamily: fonts.extrabold, color: colors.purpleDark },
+  avatarText: { fontSize: 20, fontFamily: fonts.extrabold, color: colors.blue },
   avatarName:  { fontSize: 15, fontFamily: fonts.extrabold, color: colors.text },
   avatarEmail: { fontSize: 12, fontFamily: fonts.medium, color: colors.subtext, marginTop: 2 },
 
@@ -805,7 +807,7 @@ const ss = StyleSheet.create({
   // ── Save
   saveRow: { marginTop: 16, alignItems: "flex-end" },
   saveBtn: {
-    backgroundColor: colors.darkBtn,
+    backgroundColor: colors.blue,
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: radius.input,
@@ -813,7 +815,7 @@ const ss = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  saveBtnText: { fontSize: 13, fontFamily: fonts.extrabold, color: "#FFFFFF" },
+  saveBtnText: { fontSize: 13, fontFamily: fonts.extrabold, color: colors.cardBg },
 
   // ── Toggle
   toggleRow: {
@@ -853,14 +855,14 @@ const ss = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: radius.input,
     borderWidth: 1,
-    borderColor: colors.purpleDark,
-    backgroundColor: colors.purpleLight,
+    borderColor: colors.blue,
+    backgroundColor: colors.blueLight,
   },
   linkBtnText: {
     flex: 1,
     fontSize: 13,
     fontFamily: fonts.bold,
-    color: colors.purpleDark,
+    color: colors.blue,
   },
 
   // ── Meta rows (security)
@@ -885,7 +887,7 @@ const ss = StyleSheet.create({
     borderRadius: radius.card,
     paddingVertical: 14,
   },
-  logoutText: { fontSize: 14, fontFamily: fonts.extrabold, color: "#FFFFFF" },
+  logoutText: { fontSize: 14, fontFamily: fonts.extrabold, color: colors.cardBg },
 
   footer: {
     marginTop: 8,
@@ -907,7 +909,7 @@ const ss = StyleSheet.create({
     width: "100%",
     maxWidth: 420,
     backgroundColor: colors.cardBg,
-    borderRadius: radius.cardLg,
+    borderRadius: radius.cardXl,
     padding: 20,
     ...Platform.select({
       ios: { shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 20, shadowOffset: { width: 0, height: 8 } },
@@ -918,8 +920,8 @@ const ss = StyleSheet.create({
   modalIconWrap: {
     width: 38,
     height: 38,
-    borderRadius: 10,
-    backgroundColor: colors.purpleLight,
+    borderRadius: radius.md,
+    backgroundColor: colors.blueLight,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -957,10 +959,10 @@ const ss = StyleSheet.create({
   modalCancelText: { color: colors.text, fontFamily: fonts.extrabold, fontSize: 13 },
   modalSaveBtn: {
     flex: 1,
-    backgroundColor: colors.darkBtn,
+    backgroundColor: colors.blue,
     borderRadius: radius.input,
     paddingVertical: 12,
     alignItems: "center",
   },
-  modalSaveText: { color: "#FFFFFF", fontFamily: fonts.extrabold, fontSize: 13 },
+  modalSaveText: { color: colors.cardBg, fontFamily: fonts.extrabold, fontSize: 13 },
 });

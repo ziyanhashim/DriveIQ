@@ -280,12 +280,16 @@ def session_report(session_id: str, current_user=Depends(get_current_user)):
         }
         ai_feedback = result.get("ai_feedback") or []
 
+    has_route = bool(result.get("has_route")) if result else False
+
     return to_jsonable({
         "report_ready": report_ready,
+        "has_route": has_route,
         "session_summary": {
             "date": date_str,
             "time": time_str,
             "instructor": session.get("instructor_name", "—"),
+            "trainee_name": session.get("trainee_name", "—"),
             "vehicle_id": session.get("vehicle_id", "—"),
             "duration_minutes": session.get("duration_min", 0),
         },
@@ -302,6 +306,36 @@ def session_report(session_id: str, current_user=Depends(get_current_user)):
         "ai_feedback": ai_feedback,
         "instructor_notes": session.get("instructor_notes", ""),
         "windows": (result.get("windows") if result else []),
+    })
+
+
+@router.get("/sessions/{session_id}/route")
+def session_route(session_id: str, current_user=Depends(get_current_user)):
+    """Return GPS route data for a session (for map visualization)."""
+    session = sessions_col.find_one({"session_id": session_id})
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    if current_user["role"] == "instructor":
+        if session.get("instructor_id") != current_user.get("instructor_id"):
+            raise HTTPException(status_code=403, detail="Forbidden")
+    else:
+        if session.get("trainee_id") != current_user["user_id"]:
+            raise HTTPException(status_code=403, detail="Forbidden")
+
+    result = results_col.find_one(
+        {"session_id": session_id},
+        {"route": 1, "has_route": 1, "road_type": 1},
+    )
+
+    route = (result.get("route") if result else None) or []
+
+    return to_jsonable({
+        "session_id": session_id,
+        "road_type": session.get("road_type", "Unknown"),
+        "route": route,
+        "start_point": route[0] if route else None,
+        "end_point": route[-1] if route else None,
     })
 
 
@@ -362,6 +396,9 @@ def generate_session_feedback(session_id: str, body: GenerateFeedbackRequest, cu
         import logging
         logging.getLogger("driveiq.sessions").warning(f"LLM feedback failed for {session_id}: {e}")
 
+    sf = llm_session.get("summary_feedback")
+    perf = summary.get("performance_score", round(100 - summary.get("session_risk_score", 0), 2))
+
     results_col.update_one(
         {"session_id": session_id},
         {"$set": {
@@ -372,8 +409,10 @@ def generate_session_feedback(session_id: str, body: GenerateFeedbackRequest, cu
             "road_type": rt,
             "session_summary": summary,
             "windows": ml_windows,
-            "summary_feedback": llm_session.get("summary_feedback"),
+            "performance_score": perf,
+            "summary_feedback": sf,
             "instructor_feedback": llm_session.get("instructor_feedback"),
+            "ai_feedback": [],
             "created_at": now_utc(),
         }},
         upsert=True,
@@ -466,55 +505,54 @@ def end_session(session_id: str, body: SessionEndRequest, current_user=Depends(r
     existing_result = results_col.find_one({"session_id": session_id})
 
     if not existing_result:
-        # No simulation results — run quick ML analysis from CSV
+        # No simulation results — try quick ML analysis from CSV
         road_type = (session.get("road_type") or "secondary").strip().lower()
         dataset_used = session.get("dataset_used")
 
-        if not dataset_used or "rel_path" not in dataset_used:
-            raise HTTPException(status_code=400, detail="No dataset stored for this session")
-
-        root = resolve_datasets_root()
-        csv_path = (root / dataset_used["rel_path"]).resolve()
-
-        if not csv_path.exists():
-            raise HTTPException(status_code=500, detail="Stored dataset file not found")
-
-        df = pd.read_csv(csv_path)
-
         try:
+            if not dataset_used or "rel_path" not in dataset_used:
+                raise ValueError("No dataset stored for this session")
+
+            root = resolve_datasets_root()
+            csv_path = (root / dataset_used["rel_path"]).resolve()
+
+            if not csv_path.exists():
+                raise FileNotFoundError("Stored dataset file not found")
+
+            df = pd.read_csv(csv_path)
             ml_out = predict_from_dataframe(df, road_type)
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"ML inference failed: {str(e)}")
 
-        analysis_summary = {
-            "behavior": ml_out.get("label", "Unknown"),
-            "confidence": float(ml_out.get("confidence", 0.0)),
-            "overall": int(ml_out.get("overall", 0)),
-            "badge": ml_out.get("badge", "Improving"),
-            "probs": ml_out.get("probs", {}),
-        }
+            analysis_summary = {
+                "behavior": ml_out.get("label", "Unknown"),
+                "confidence": float(ml_out.get("confidence", 0.0)),
+                "overall": int(ml_out.get("overall", 0)),
+                "badge": ml_out.get("badge", "Improving"),
+                "probs": ml_out.get("probs", {}),
+            }
 
-        ai_feedback = [{
-            "priority": "high" if analysis_summary["behavior"] != "Normal" else "medium",
-            "title": "Session analysis",
-            "message": f"{analysis_summary['behavior']} (confidence {round(analysis_summary['confidence'] * 100)}%)",
-            "icon": "🤖",
-        }]
+            ai_feedback = [{
+                "priority": "high" if analysis_summary["behavior"] != "Normal" else "medium",
+                "title": "Session analysis",
+                "message": f"{analysis_summary['behavior']} (confidence {round(analysis_summary['confidence'] * 100)}%)",
+                "icon": "🤖",
+            }]
 
-        result_doc = {
-            "session_id": session_id,
-            "booking_id": session.get("booking_id"),
-            "trainee_id": session.get("trainee_id"),
-            "instructor_id": session.get("instructor_id"),
-            "instructor_name": session.get("instructor_name", ""),
-            "created_at": now_utc(),
-            "method": "ml_v1",
-            "dataset_used": dataset_used,
-            "analysis": analysis_summary,
-            "ai_feedback": ai_feedback,
-        }
+            result_doc = {
+                "session_id": session_id,
+                "booking_id": session.get("booking_id"),
+                "trainee_id": session.get("trainee_id"),
+                "instructor_id": session.get("instructor_id"),
+                "instructor_name": session.get("instructor_name", ""),
+                "created_at": now_utc(),
+                "method": "ml_v1",
+                "dataset_used": dataset_used,
+                "analysis": analysis_summary,
+                "ai_feedback": ai_feedback,
+            }
 
-        results_col.insert_one(result_doc)
+            results_col.insert_one(result_doc)
+        except Exception:
+            pass  # ML analysis is best-effort; session still ends
 
     # Mark session as completed
     sessions_col.update_one(
@@ -579,21 +617,47 @@ def simulate_session(session_id: str, current_user=Depends(require_role("instruc
     summary = scenario["session_summary"]
     performance_score = scenario.get("performance_score", round(100 - summary.get("session_risk_score", 0), 2))
 
+    # Build ai_feedback and analysis from scenario data
+    sf = scenario.get("summary_feedback")
+    ws = scenario.get("window_summary", {})
+    ai_feedback = [{
+        "priority": "high" if performance_score < 60 else "medium" if performance_score < 80 else "low",
+        "title": "Session Summary",
+        "message": sf,
+        "icon": "\U0001f9e0",
+    }] if sf else []
+
+    normal_count = ws.get("normal", 0)
+    aggressive_count = ws.get("aggressive", 0)
+    drowsy_count = ws.get("drowsy", 0)
+    total = ws.get("total", len(windows))
+    dominant = "Normal" if normal_count >= aggressive_count and normal_count >= drowsy_count else "Aggressive" if aggressive_count > drowsy_count else "Drowsy"
+    badge = "Safe Driver" if performance_score >= 80 else "Improving" if performance_score >= 60 else "Needs Work"
+
     # Store results so they're available for the report after session ends
     results_col.update_one(
         {"session_id": session_id},
         {"$set": {
             "session_id": session_id,
             "trainee_id": session.get("trainee_id"),
+            "trainee_name": session.get("trainee_name", ""),
             "instructor_id": session.get("instructor_id"),
+            "instructor_name": session.get("instructor_name", ""),
             "booking_id": session.get("booking_id"),
             "road_type": road_type,
             "session_summary": summary,
             "windows": windows,
-            "window_summary": scenario.get("window_summary"),
+            "window_summary": ws,
             "performance_score": performance_score,
-            "summary_feedback": scenario.get("summary_feedback"),
+            "analysis": {
+                "behavior": dominant,
+                "confidence": round(normal_count / total, 2) if total else 0,
+                "overall": int(performance_score),
+                "badge": badge,
+            },
+            "summary_feedback": sf,
             "instructor_feedback": scenario.get("instructor_feedback"),
+            "ai_feedback": ai_feedback,
             "method": "demo_simulation",
             "created_at": now_utc(),
         }},
@@ -612,6 +676,7 @@ def simulate_session(session_id: str, current_user=Depends(require_role("instruc
             "total_windows": summary.get("total_windows"),
             "total_alerts": summary.get("total_alerts"),
             "window_summary": scenario.get("window_summary"),
+            "instructor_notes": scenario.get("instructor_notes", ""),
         }},
     )
 
@@ -627,45 +692,45 @@ def simulate_session(session_id: str, current_user=Depends(require_role("instruc
     })
 
 
-# ── Clear demo session history ────────────────────────────────────────────────
+# ── Clear demo data ──────────────────────────────────────────────────────────
 
 @router.delete("/sessions/clear-demo")
-def clear_demo_sessions(current_user=Depends(get_current_user)):
+def clear_demo_data(current_user=Depends(get_current_user)):
     """
-    Clear sessions created via the demo simulation.
-    Only removes sessions with method='demo_simulation' in results.
-    Resets related bookings to 'confirmed' so they can be reused.
+    Full demo reset: clears demo sessions, results, bookings, and availability slots.
     """
-    # Find demo results
+    from app.database import availability_col
+
+    # Clear demo simulation sessions and results (preserve seeded dummy history)
     demo_results = list(results_col.find({"method": "demo_simulation"}, {"session_id": 1}))
     demo_session_ids = [r["session_id"] for r in demo_results]
 
-    if not demo_session_ids:
-        return {"status": "ok", "cleared": 0}
+    r_del_count = 0
+    s_del_count = 0
+    if demo_session_ids:
+        r_del = results_col.delete_many({"session_id": {"$in": demo_session_ids}})
+        s_del = sessions_col.delete_many({"session_id": {"$in": demo_session_ids}})
+        r_del_count = r_del.deleted_count
+        s_del_count = s_del.deleted_count
 
-    # Get booking IDs to reset
-    demo_sessions = list(sessions_col.find(
-        {"session_id": {"$in": demo_session_ids}},
-        {"booking_id": 1},
-    ))
-    booking_ids = [s["booking_id"] for s in demo_sessions if s.get("booking_id")]
+    # Clear all bookings and reset their slots back to available
+    booked_bookings = list(bookings_col.find({}, {"slot_id": 1}))
+    slot_ids = [b["slot_id"] for b in booked_bookings if b.get("slot_id")]
 
-    # Delete results and sessions
-    r_del = results_col.delete_many({"session_id": {"$in": demo_session_ids}})
-    s_del = sessions_col.delete_many({"session_id": {"$in": demo_session_ids}})
+    b_del = bookings_col.delete_many({})
 
-    # Reset bookings back to confirmed
-    if booking_ids:
-        bookings_col.update_many(
-            {"booking_id": {"$in": booking_ids}},
-            {"$set": {"status": "confirmed", "session_id": None}},
+    if slot_ids:
+        availability_col.update_many(
+            {"slot_id": {"$in": slot_ids}},
+            {"$set": {"status": "available"}},
         )
 
     return {
         "status": "ok",
-        "cleared": r_del.deleted_count,
-        "sessions_removed": s_del.deleted_count,
-        "bookings_reset": len(booking_ids),
+        "results_cleared": r_del_count,
+        "sessions_removed": s_del_count,
+        "bookings_cleared": b_del.deleted_count,
+        "slots_freed": len(slot_ids),
     }
 
 

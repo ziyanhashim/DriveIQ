@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { apiGet } from "../../lib/api";
+import { colors, fonts, radius, space } from "../../lib/theme";
 
 function initialsFromName(name?: string) {
   if (!name) return "—";
@@ -49,7 +50,7 @@ export default function StudentProfileScreen() {
     return (
       <View style={[styles.page, { alignItems: "center", justifyContent: "center" }]}>
         <ActivityIndicator size="large" />
-        <Text style={{ marginTop: 10, fontWeight: "800", color: "#667085" }}>
+        <Text style={{ marginTop: 10, fontFamily: fonts.extrabold, color: colors.subtextAlt }}>
           Loading student profile…
         </Text>
       </View>
@@ -76,7 +77,7 @@ export default function StudentProfileScreen() {
   // Compute overview stats
   const completedCount = sessions.filter((s) => s.status === "completed").length;
   const scores = results
-    .map((r: any) => r?.analysis?.overall ?? r?.performance_score)
+    .map((r: any) => r?.performance_score ?? r?.analysis?.overall)
     .filter((v): v is number => typeof v === "number" && v > 0);
   const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null;
 
@@ -150,8 +151,8 @@ export default function StudentProfileScreen() {
                     </Text>
                   </View>
                   {typeof score === "number" && score > 0 ? (
-                    <View style={[styles.scorePill, { backgroundColor: score >= 70 ? "#ECFDF3" : "#FEF2F2" }]}>
-                      <Text style={[styles.scoreText, { color: score >= 70 ? "#16A34A" : "#B91C1C" }]}>
+                    <View style={[styles.scorePill, { backgroundColor: score >= 60 ? colors.greenLight : colors.redLight }]}>
+                      <Text style={[styles.scoreText, { color: score >= 60 ? colors.green : colors.redDark }]}>
                         {score}
                       </Text>
                     </View>
@@ -167,25 +168,25 @@ export default function StudentProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  page: { flex: 1, backgroundColor: "#F5F7FB" },
-  content: { padding: 16, paddingBottom: 28 },
+  page: { flex: 1, backgroundColor: colors.pageBgAlt },
+  content: { padding: space.lg, paddingBottom: 28 },
 
   header: {
     paddingVertical: 10,
-    marginBottom: 12,
+    marginBottom: space.md,
   },
-  backBtn: { paddingVertical: 6, paddingHorizontal: 4, alignSelf: "flex-start" },
-  backText: { color: "#2563EB", fontWeight: "900", fontSize: 13 },
+  backBtn: { paddingVertical: 6, paddingHorizontal: space.xs, alignSelf: "flex-start" },
+  backText: { color: colors.blue, fontFamily: fonts.extrabold, fontSize: 13 },
 
-  title: { color: "#0B1220", fontWeight: "900", fontSize: 22, marginTop: 8 },
-  subTitle: { color: "#667085", fontWeight: "700", fontSize: 12, marginTop: 6 },
+  title: { color: colors.text, fontFamily: fonts.extrabold, fontSize: 22, marginTop: space.sm },
+  subTitle: { color: colors.subtextAlt, fontFamily: fonts.bold, fontSize: 12, marginTop: 6 },
 
   card: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.cardBg,
     borderWidth: 1,
-    borderColor: "#EAECF0",
-    borderRadius: 16,
-    padding: 14,
+    borderColor: colors.border,
+    borderRadius: radius.card,
+    padding: space.lg,
   },
 
   topRow: { flexDirection: "row", alignItems: "center" },
@@ -194,48 +195,48 @@ const styles = StyleSheet.create({
     width: 54,
     height: 54,
     borderRadius: 27,
-    backgroundColor: "#EEF2FF",
+    backgroundColor: colors.blueDark,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 12,
+    marginRight: space.md,
   },
-  avatarText: { color: "#4F46E5", fontWeight: "900", fontSize: 16 },
+  avatarText: { color: "#FFFFFF", fontFamily: fonts.extrabold, fontSize: 16 },
 
-  name: { color: "#101828", fontWeight: "900", fontSize: 16 },
-  emailText: { color: "#667085", fontWeight: "700", fontSize: 12, marginTop: 4 },
+  name: { color: colors.textAlt, fontFamily: fonts.extrabold, fontSize: 16 },
+  emailText: { color: colors.subtextAlt, fontFamily: fonts.bold, fontSize: 12, marginTop: space.xs },
 
-  section: { marginTop: 16 },
-  sectionTitle: { color: "#101828", fontWeight: "900", fontSize: 13, marginBottom: 10 },
+  section: { marginTop: space.lg },
+  sectionTitle: { color: colors.textAlt, fontFamily: fonts.extrabold, fontSize: 13, marginBottom: 10 },
 
   kvRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     paddingVertical: 10,
     borderTopWidth: 1,
-    borderTopColor: "#F2F4F7",
+    borderTopColor: colors.borderLight,
   },
-  kLabel: { color: "#667085", fontWeight: "800", fontSize: 12 },
-  kValue: { color: "#101828", fontWeight: "900", fontSize: 12 },
+  kLabel: { color: colors.subtextAlt, fontFamily: fonts.extrabold, fontSize: 12 },
+  kValue: { color: colors.textAlt, fontFamily: fonts.extrabold, fontSize: 12 },
 
   sessionRow: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 10,
     borderTopWidth: 1,
-    borderTopColor: "#F2F4F7",
+    borderTopColor: colors.borderLight,
   },
-  sessionDate: { color: "#101828", fontWeight: "900", fontSize: 12 },
-  sessionMeta: { color: "#667085", fontWeight: "700", fontSize: 11, marginTop: 2 },
+  sessionDate: { color: colors.textAlt, fontFamily: fonts.extrabold, fontSize: 12 },
+  sessionMeta: { color: colors.subtextAlt, fontFamily: fonts.bold, fontSize: 11, marginTop: 2 },
 
   scorePill: {
-    borderRadius: 10,
+    borderRadius: radius.md,
     paddingHorizontal: 10,
     paddingVertical: 6,
     minWidth: 40,
     alignItems: "center",
   },
-  scoreText: { fontWeight: "900", fontSize: 13 },
+  scoreText: { fontFamily: fonts.extrabold, fontSize: 13 },
 
-  emptyTitle: { color: "#101828", fontWeight: "900", fontSize: 14 },
-  emptyText: { color: "#667085", fontWeight: "700", fontSize: 12, marginTop: 6 },
+  emptyTitle: { color: colors.textAlt, fontFamily: fonts.extrabold, fontSize: 14 },
+  emptyText: { color: colors.subtextAlt, fontFamily: fonts.bold, fontSize: 12, marginTop: 6 },
 });

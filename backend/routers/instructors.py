@@ -84,11 +84,12 @@ def get_instructor_availability(
     from datetime import datetime
 
     today = now_utc()
-    today_str = today.strftime("%Y-%m-%d")
+    tomorrow = today + timedelta(days=1)
+    tomorrow_str = tomorrow.strftime("%Y-%m-%d")
     future = today + timedelta(days=14)
     future_str = future.strftime("%Y-%m-%d")
 
-    start = date_from or today_str
+    start = date_from or tomorrow_str
     end = date_to or future_str
 
     # Auto-generate weekly recurring slots for dates that don't have any yet.

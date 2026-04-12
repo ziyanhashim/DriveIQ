@@ -33,7 +33,7 @@ export default function FilterChips({ options, value, onChange, showCounts = fal
     >
       {chips.map((chip) => {
         const active = chip.label === value;
-        const chipColor = chip.color ?? colors.purpleDark;
+        const chipColor = chip.color ?? colors.blue;
 
         return (
           <AnimatedPressable

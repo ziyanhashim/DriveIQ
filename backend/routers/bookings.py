@@ -25,6 +25,11 @@ def book_slot(body: BookSlotRequest, current_user=Depends(require_role("trainee"
     if slot.get("status") != "open":
         raise HTTPException(status_code=400, detail="Slot is no longer available")
 
+    from datetime import timedelta
+    tomorrow_str = (now_utc() + timedelta(days=1)).strftime("%Y-%m-%d")
+    if (slot.get("date") or "") < tomorrow_str:
+        raise HTTPException(status_code=400, detail="Slots must be booked at least one day in advance")
+
     trainee_id = current_user["user_id"]
     instructor_id = slot["instructor_id"]
     booking_id = uuid.uuid4().hex

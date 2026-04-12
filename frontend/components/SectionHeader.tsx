@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, TextStyle } from "react-native";
 import { colors, type_, radius, fonts } from "../lib/theme";
 
 type SectionHeaderProps = {
@@ -8,16 +8,17 @@ type SectionHeaderProps = {
   label: string;
   count?: number;
   right?: React.ReactNode;
+  labelStyle?: TextStyle;
 };
 
-export default function SectionHeader({ icon, iconBg = colors.borderLight, label, count, right }: SectionHeaderProps) {
+export default function SectionHeader({ icon, iconBg = colors.borderLight, label, count, right, labelStyle }: SectionHeaderProps) {
   return (
     <View style={s.row}>
       <View style={s.left}>
         <View style={[s.iconWrap, { backgroundColor: iconBg }]}>
           <Text style={s.iconText}>{icon}</Text>
         </View>
-        <Text style={s.label}>{label}</Text>
+        <Text style={[s.label, labelStyle]}>{label}</Text>
         {count !== undefined && count > 0 && (
           <View style={s.countBadge}>
             <Text style={s.countText}>{count}</Text>
@@ -42,14 +43,14 @@ const s = StyleSheet.create({
     gap: 8,
   },
   iconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.sm,
+    width: 34,
+    height: 34,
+    borderRadius: radius.md,
     alignItems: "center",
     justifyContent: "center",
   },
   iconText: {
-    fontSize: 15,
+    fontSize: 16,
   },
   label: {
     ...type_.cardTitle,

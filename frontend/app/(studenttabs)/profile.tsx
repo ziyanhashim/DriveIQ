@@ -49,7 +49,14 @@ export default function Profile() {
       setStoredName(name || "");
       setStoredEmail(email || "");
       setStoredMobile(mobile || "");
-      const data = await apiGet("/dashboard/trainee");
+      const [data, me] = await Promise.all([
+        apiGet("/dashboard/trainee"),
+        apiGet("/auth/me").catch(() => null),
+      ]);
+      // Refresh from API if available
+      if (me?.email) setStoredEmail(me.email);
+      if (me?.name) setStoredName(me.name);
+      if (me?.mobile) setStoredMobile(me.mobile);
       setDash(data);
     } catch {
       setDash(null);
@@ -65,12 +72,19 @@ export default function Profile() {
   const fullName            = dash?.welcome?.name || storedName || "—";
   const email               = storedEmail || "—";
   const mobile              = storedMobile || "—";
-  const license             = dash?.profile?.license || "—";
   const status              = dash?.welcome?.badge || "—";
   const sessionsCompleted   = dash?.progress?.sessions_completed ?? 0;
   const sessionsTotal       = dash?.progress?.target_sessions ?? 0;
   const currentDrivingScore = dash?.progress?.current_score ?? 0;
-  const instructorName      = dash?.link?.instructor?.name || dash?.link?.instructor?.instructor_name || "—";
+
+  // Derive current instructor from upcoming sessions or recent reports
+  const instructorName = (() => {
+    const upcoming = Array.isArray(dash?.upcoming_sessions) ? dash.upcoming_sessions : [];
+    if (upcoming.length > 0) return upcoming[0]?.instructor || upcoming[0]?.instructor_name || "";
+    const reports = Array.isArray(dash?.recent_reports) ? dash.recent_reports : [];
+    if (reports.length > 0) return reports[0]?.instructor_name || reports[0]?.instructor || "";
+    return "";
+  })();
 
   const badges: Badge[] = Array.isArray(dash?.achievements)
     ? dash.achievements.filter((a: any) => a.earned).map((a: any, i: number) => ({
@@ -78,8 +92,28 @@ export default function Profile() {
       }))
     : [];
 
-  const instructorHistory: InstructorHistory[] = Array.isArray(dash?.instructor_history)
-    ? dash.instructor_history : [];
+  // Derive instructor history from recent reports
+  const instructorHistory: InstructorHistory[] = (() => {
+    const reports = Array.isArray(dash?.recent_reports) ? dash.recent_reports : [];
+    const byInstructor = new Map<string, { name: string; count: number }>();
+    for (const r of reports) {
+      const name = r?.instructor_name || r?.instructor;
+      if (!name || name === "—") continue;
+      const existing = byInstructor.get(name);
+      if (existing) {
+        existing.count++;
+      } else {
+        byInstructor.set(name, { name, count: 1 });
+      }
+    }
+    return Array.from(byInstructor.values()).map((inst, i) => ({
+      id: `ih-${i}`,
+      name: inst.name,
+      rating: 0,
+      sessionsCompleted: inst.count,
+      notes: [],
+    }));
+  })();
 
   const milestones: Milestone[] = Array.isArray(dash?.milestones)
     ? dash.milestones : [];
@@ -124,7 +158,7 @@ export default function Profile() {
   if (loading) {
     return (
       <View style={s.center}>
-        <ActivityIndicator size="large" color={colors.purpleDark} />
+        <ActivityIndicator size="large" color={colors.blue} />
         <Text style={page.centerText}>Loading profile…</Text>
       </View>
     );
@@ -159,16 +193,10 @@ export default function Profile() {
               <InfoBlock label="Full Name"              icon="person-outline"  value={fullName} />
               <InfoBlock label="Email Address"          icon="mail-outline"    value={email} />
               <InfoBlock label="Mobile Number"          icon="call-outline"    value={mobile} />
-              <InfoBlock label="Driving License Number" icon="card-outline"    value={license} />
             </View>
             {status !== "—" && (
               <View style={s.statusPill}>
                 <Text style={s.statusPillText}>{status}</Text>
-              </View>
-            )}
-            {instructorName !== "—" && (
-              <View style={[s.statusPill, { marginTop: 8, backgroundColor: colors.greenLight, borderColor: colors.greenBorderAlt }]}>
-                <Text style={[s.statusPillText, { color: colors.greenDark }]}>Instructor: {instructorName}</Text>
               </View>
             )}
           </View>
@@ -210,11 +238,7 @@ export default function Profile() {
                       <Text style={s.historyAvatarText}>{initials(inst.name)}</Text>
                     </View>
                     <View style={{ flex: 1 }}>
-                      <View style={s.historyNameRow}>
-                        <Text style={s.historyName}>{inst.name}</Text>
-                        <Ionicons name="star" size={14} color={colors.yellow} />
-                        <Text style={s.historyRating}>{inst.rating.toFixed(1)}</Text>
-                      </View>
+                      <Text style={s.historyName}>{inst.name}</Text>
                       <Text style={s.historySub}>{inst.sessionsCompleted} sessions completed</Text>
                     </View>
                   </View>
@@ -280,7 +304,7 @@ export default function Profile() {
               return (
                 <View key={m.id} style={[
                   s.milestoneCard,
-                  earned ? { backgroundColor: colors.yellowLight, borderColor: tint.yellow.border }
+                  earned ? { backgroundColor: colors.blueLight, borderColor: colors.blueBorder }
                           : { backgroundColor: colors.pageBg, borderColor: colors.borderMid },
                 ]}>
                   <Text style={s.milestoneEmoji}>{m.emoji}</Text>
@@ -347,7 +371,7 @@ const s = StyleSheet.create({
   sectionTitle:    { ...type_.sectionTitle },
 
   personalRow:  { flexDirection: "row", gap: 14, alignItems: "center" },
-  avatar:       { width: 88, height: 88, borderRadius: radius.pill, backgroundColor: colors.avatarPurple, alignItems: "center", justifyContent: "center" },
+  avatar:       { width: 88, height: 88, borderRadius: radius.pill, backgroundColor: colors.blueDark, alignItems: "center", justifyContent: "center" },
   avatarText:   { color: "#FFFFFF", fontSize: 30, fontFamily: fonts.extrabold },
   personalGrid: { flexDirection: "row", flexWrap: "wrap", gap: space.md },
   infoBlock:    { flexBasis: "48%", flexGrow: 1, minWidth: 150 },
@@ -355,12 +379,12 @@ const s = StyleSheet.create({
   infoValueRow: { flexDirection: "row", alignItems: "center", marginTop: 6 },
   infoValue:    { ...type_.body, fontFamily: fonts.bold },
 
-  statusPill:     { marginTop: 12, alignSelf: "flex-start", backgroundColor: colors.purpleChip, borderWidth: 1, borderColor: colors.blueChip, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 6 },
+  statusPill:     { marginTop: 12, alignSelf: "flex-start", backgroundColor: colors.blueLight, borderWidth: 1, borderColor: colors.blueBorder, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 6 },
   statusPillText: { color: colors.blue, fontSize: 11, fontFamily: fonts.extrabold },
 
   // Badges
   badgeGrid: { flexDirection: "row", flexWrap: "wrap", gap: space.md },
-  badgeCard: { flexGrow: 1, flexBasis: "23%", minWidth: 160, borderWidth: 1, borderColor: tint.yellow.border, backgroundColor: colors.yellowLight, borderRadius: radius.input, padding: 14, alignItems: "center", justifyContent: "center" },
+  badgeCard: { flexGrow: 1, flexBasis: "23%", minWidth: 160, borderWidth: 1, borderColor: colors.blueBorder, backgroundColor: colors.blueLight, borderRadius: radius.input, padding: 14, alignItems: "center", justifyContent: "center" },
   badgeEmoji:{ fontSize: 24, marginBottom: 8 },
   badgeTitle:{ ...type_.body, textAlign: "center", fontFamily: fonts.bold },
   levelPill: { marginTop: 10, borderWidth: 1, borderColor: colors.borderMid, backgroundColor: colors.cardBg, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 6 },
@@ -369,7 +393,7 @@ const s = StyleSheet.create({
   // Instructor History
   historyCard:      { borderWidth: 1, borderColor: colors.borderAlt, borderRadius: radius.input, padding: 14, backgroundColor: colors.cardBg },
   historyTopRow:    { flexDirection: "row", alignItems: "center", gap: space.md },
-  historyAvatar:    { width: 54, height: 54, borderRadius: radius.pill, backgroundColor: colors.avatarPurple, alignItems: "center", justifyContent: "center" },
+  historyAvatar:    { width: 54, height: 54, borderRadius: radius.pill, backgroundColor: colors.blueDark, alignItems: "center", justifyContent: "center" },
   historyAvatarText:{ color: "#FFFFFF", fontSize: 16, fontFamily: fonts.extrabold },
   historyNameRow:   { flexDirection: "row", alignItems: "center", gap: 6 },
   historyName:      { ...type_.sectionTitle },
@@ -386,7 +410,7 @@ const s = StyleSheet.create({
   milestoneEmoji: { fontSize: 26, marginBottom: 10 },
   milestoneTitle: { ...type_.body, textAlign: "center", fontFamily: fonts.bold },
   milestoneDesc:  { marginTop: 8, ...type_.body, textAlign: "center", lineHeight: 18 },
-  earnedPill:     { marginTop: 12, backgroundColor: colors.darkBtn, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 8, flexDirection: "row", alignItems: "center" },
+  earnedPill:     { marginTop: 12, backgroundColor: colors.blue, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 8, flexDirection: "row", alignItems: "center" },
   lockedPill:     { backgroundColor: colors.borderMid },
   earnedPillText: { color: "#FFFFFF", fontSize: 11, fontFamily: fonts.bold },
   milestoneDate:  { marginTop: 10, ...type_.labelSm },

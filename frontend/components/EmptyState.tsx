@@ -17,7 +17,7 @@ export default function EmptyState({ icon = "document-text-outline", title, text
   return (
     <FadeInView>
       <View style={s.container}>
-        <Ionicons name={icon} size={40} color={colors.border} />
+        <Ionicons name={icon} size={44} color={colors.muted} />
         {title ? <Text style={s.title}>{title}</Text> : null}
         <Text style={s.text}>{text}</Text>
         {actionLabel && onAction ? (

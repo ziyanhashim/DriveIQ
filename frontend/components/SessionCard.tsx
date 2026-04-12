@@ -53,7 +53,8 @@ export default function SessionCard({
   delay,
   onPress,
 }: SessionCardProps) {
-  const scoreColor = getScoreColor(performanceScore);
+  const roundedScore = Math.round(performanceScore);
+  const scoreColor = getScoreColor(roundedScore);
   const flagged = windowSummary ? windowSummary.aggressive + windowSummary.drowsy : 0;
 
   const cardContent = (
@@ -86,8 +87,8 @@ export default function SessionCard({
 
         {/* Score badge */}
         {reportReady ? (
-          <View style={[s.scoreBadge, { backgroundColor: getScoreBg(performanceScore) }]}>
-            <Text style={[s.scoreText, { color: scoreColor }]}>{performanceScore}</Text>
+          <View style={[s.scoreBadge, { backgroundColor: getScoreBg(roundedScore) }]}>
+            <Text style={[s.scoreText, { color: scoreColor }]}>{roundedScore}</Text>
             <Text style={[s.scoreUnit, { color: scoreColor }]}>/100</Text>
           </View>
         ) : (
@@ -179,7 +180,7 @@ const s = StyleSheet.create({
     alignItems: "baseline",
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 12,
+    borderRadius: radius.input,
   },
   scoreText: {
     fontSize: 20,
@@ -196,7 +197,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 12,
+    borderRadius: radius.input,
     backgroundColor: colors.disabledBg,
     borderWidth: 1,
     borderColor: colors.disabledBorder,
