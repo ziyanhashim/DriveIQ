@@ -33,7 +33,7 @@ Two user roles drive the platform: **students** (learner drivers) book sessions 
 ```
 
 - **Frontend** — Expo 54 / React Native 0.81 / TypeScript. File-based routing via expo-router with two role-specific tab groups (`(studenttabs)/` and `(instructortabs)/`). JWT stored in AsyncStorage.
-- **Backend** — FastAPI with 8 routers handling auth, instructors, bookings, sessions, ML pipeline, dashboards, reviews, and profiles. JWT authentication via python-jose with bcrypt password hashing. Sync PyMongo for MongoDB access.
+- **Backend** — FastAPI with 8 routers handling auth, instructors, bookings, sessions, ML pipeline, dashboards, reviews, and profiles. JWT authentication via python-jose with bcrypt password hashing. Sync PyMongo for MongoDB access. LLM-powered feedback via OpenAI gpt-4o-mini.
 - **ML Pipeline** — 4-phase sequential pipeline in `ml-model/src/`. Called from `routers/session_router.py` via `run_full_knn_pipeline()`. Pre-trained LSTM and KNN models loaded from `ml-model/models/`.
 - **Database** — MongoDB Atlas with 9 collections for users, sessions, ML results, bookings, reviews, and configuration.
 
@@ -198,6 +198,7 @@ This phase converts numerical performance indicators into clear, human-readable 
 | Authentication | JWT (python-jose) + bcrypt (passlib) |
 | ML Classification | TensorFlow / Keras (LSTM) |
 | ML Anomaly Detection | scikit-learn (KNN) |
+| LLM Feedback | OpenAI gpt-4o-mini (via dspydantic) |
 | Data Processing | pandas, NumPy |
 | Imputation | sklearn KNNImputer |
 
@@ -213,6 +214,8 @@ DriveIQ/
 │   │   ├── auth.py                  # JWT token creation & validation
 │   │   ├── models.py                # Pydantic request/response schemas
 │   │   ├── permissions.py           # Role-based access control
+│   │   ├── llm/
+│   │   │   └── feedback.py          # LLM feedback generation (OpenAI gpt-4o-mini)
 │   │   └── ml/
 │   │       ├── predictor.py         # Session-level ML prediction wrapper
 │   │       ├── keras_runtime.py     # Model & scaler loading (cached)
@@ -221,13 +224,11 @@ DriveIQ/
 │   │   ├── auth.py                  # Register, login, change password
 │   │   ├── instructors.py           # Browse instructors, manage availability
 │   │   ├── bookings.py              # Book & cancel lesson slots
-│   │   ├── sessions.py              # Session lifecycle, reports, timeline
+│   │   ├── sessions.py              # Session lifecycle, reports, simulation, feedback
 │   │   ├── session_router.py        # ML pipeline endpoint (upload & process)
 │   │   ├── dashboard.py             # Trainee & instructor dashboard data
 │   │   ├── reviews.py               # Instructor reviews
 │   │   └── profile.py               # User profile & settings
-│   ├── scripts/
-│   │   └── seed_demo_data.py        # Demo data seeder
 │   └── requirements.txt
 │
 ├── frontend/
@@ -239,16 +240,18 @@ DriveIQ/
 │   │   │   ├── dashboard.tsx        # Student dashboard (KPIs, bookings, reports)
 │   │   │   ├── sessions.tsx         # Browse & book instructors
 │   │   │   ├── reports.tsx          # Session reports list
-│   │   │   ├── session-report.tsx   # Detailed ML report with timeline
+│   │   │   ├── session-report.tsx   # Detailed ML report with route map
 │   │   │   ├── profile.tsx          # Student profile
 │   │   │   └── settings.tsx         # App settings
 │   │   ├── (instructortabs)/
 │   │   │   ├── dashboard.tsx        # Instructor dashboard (learners, metrics)
-│   │   │   ├── sessions.tsx         # Manage active sessions
+│   │   │   ├── sessions.tsx         # Manage & simulate live sessions
 │   │   │   ├── records.tsx          # Learner performance records
+│   │   │   ├── session-report.tsx   # Instructor session report view
 │   │   │   └── settings.tsx         # Instructor settings
+│   │   ├── notification/[id].tsx    # Notification detail
 │   │   └── student/[id].tsx         # Student detail (instructor view)
-│   ├── components/                  # Reusable UI (ScoreRing, BehaviorBar, MetricCard, etc.)
+│   ├── components/                  # Reusable UI (ScoreRing, SessionCard, RouteMapModal, etc.)
 │   ├── lib/
 │   │   ├── api.ts                   # Fetch wrapper with JWT auto-injection
 │   │   ├── config.ts                # API base URL
@@ -268,9 +271,9 @@ DriveIQ/
 │   │   └── 04_knn_alerts_performance_feedback_V2.ipynb  # Phase 3+4 final
 │   └── README.md                        # ML pipeline documentation
 │
-├── start-dev.sh                # Start backend + frontend together
-├── CLAUDE.md                   # AI assistant guidance
-└── README.md                   # This file
+├── docs/                           # Additional documentation
+├── Final Report - CSIT321 - Capstone.docx  # Capstone final report
+└── README.md                       # This file
 ```
 
 ## Features
@@ -283,7 +286,8 @@ DriveIQ/
 - Book available time slots for driving lessons
 - View upcoming sessions with countdown timers
 - Detailed session reports with per-window behavior timeline, alert causes, severity scores, and trigger features
-- AI-generated driving feedback and recommendations
+- Interactive route map showing driving path with behavior-coded markers (normal/aggressive/drowsy)
+- AI-generated driving feedback and recommendations (per-window and session-level via LLM)
 - Track achievements and progress milestones
 - Profile management, settings, and password change
 
@@ -293,8 +297,10 @@ DriveIQ/
 - Dashboard: total learners, sessions conducted, average performance across students
 - Manage availability by publishing and removing time slots
 - Start and end driving sessions linked to confirmed bookings
+- Live session simulation with real-time window-by-window behavior analysis
 - Automatically run ML pipeline when ending a session
-- View detailed ML analysis reports for each learner session
+- View detailed ML analysis reports with route map visualization for each learner session
+- Generate LLM-powered feedback for sessions (student-facing and instructor-facing)
 - Add instructor notes to session reports
 - Manage profile: bio, specialties, pricing, vehicle, languages, location
 - View learner sidebar with status indicators (Active / Scheduled / Learner)
@@ -317,15 +323,24 @@ DriveIQ/
 | `GET` | `/bookings/me` | Yes | User's bookings |
 | `DELETE` | `/bookings/:id` | Yes | Cancel booking |
 | `GET` | `/sessions` | Yes | List sessions (role-aware) |
+| `GET` | `/sessions/active` | Yes | Currently active sessions |
+| `GET` | `/sessions/my-reports` | Student | Completed sessions with summaries |
 | `POST` | `/sessions/:booking_id/start` | Instructor | Start session from booking |
 | `POST` | `/sessions/:id/end` | Instructor | End session and run ML inference |
+| `POST` | `/sessions/:id/simulate` | Instructor | Simulate live session with demo data |
 | `GET` | `/sessions/:id/report` | Yes | Session report with ML analysis |
 | `GET` | `/sessions/:id/timeline` | Yes | Per-window timeline with timestamps |
-| `GET` | `/sessions/my-reports` | Student | Completed sessions with summaries |
+| `GET` | `/sessions/:id/route` | Yes | Route GPS data for map visualization |
+| `POST` | `/sessions/:id/generate-feedback` | Yes | Generate LLM feedback for session |
+| `PATCH` | `/sessions/:id/notes` | Instructor | Update instructor notes on session |
+| `GET` | `/records/instructor` | Instructor | Instructor's learner records |
+| `GET` | `/records/trainee` | Student | Trainee's session records |
 | `POST` | `/api/sessions/upload-and-process` | — | Upload sensor JSON, run full ML pipeline |
 | `GET` | `/api/sessions/results/:id` | — | Full ML results for a session |
 | `GET` | `/dashboard/trainee` | Student | Trainee dashboard data |
 | `GET` | `/dashboard/instructor` | Instructor | Instructor dashboard data |
+| `GET` | `/instructor/learners` | Instructor | List instructor's learners |
+| `GET` | `/instructor/student/:id/history` | Instructor | Student session history |
 | `POST` | `/reviews` | Student | Leave instructor review |
 | `GET` | `/reviews/:instructor_id` | Yes | Instructor's reviews |
 | `GET` | `/settings/me` | Yes | User settings |
@@ -355,6 +370,7 @@ Create `backend/.env`:
 MONGO_URI=mongodb+srv://<user>:<password>@<cluster>.mongodb.net
 MONGO_DB=driver_behavior
 JWT_SECRET=your_secret_key
+OPENAI_API_KEY=your_openai_api_key    # Required for LLM feedback generation
 ```
 
 Start the server:
