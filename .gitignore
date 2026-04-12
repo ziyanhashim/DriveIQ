@@ -30,6 +30,7 @@ node_modules/
 frontend/.expo/web/
 
 # Claude Code
+.claude/
 CLAUDE.md
 
 # Dev scripts
