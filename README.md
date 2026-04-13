@@ -12,7 +12,7 @@ Two user roles drive the platform: **students** (learner drivers) book sessions 
 
 [Visit DriveIQ Website](https://driveiq-ai.lovable.app/)
 
-[![DriveIQ Website Repository](https://github.com/Seiffarouk/driveiq-ai.git)
+[DriveIQ Website Repository](https://github.com/Seiffarouk/driveiq-ai.git)
 
 ## Demo Video
 
