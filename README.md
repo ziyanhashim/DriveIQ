@@ -8,6 +8,12 @@ DriveIQ is a capstone project that combines a **React Native mobile app**, a **F
 
 Two user roles drive the platform: **students** (learner drivers) book sessions with instructors, complete driving lessons, and receive ML-analyzed session reports; **instructors** manage their availability, run sessions, and review learner progress with AI-generated insights.
 
+## Website
+
+[Visit DriveIQ Website](https://driveiq-ai.lovable.app/)
+
+[![DriveIQ Website Repository](https://github.com/Seiffarouk/driveiq-ai.git)
+
 ## Demo Video
 
 [![DriveIQ Demo](https://img.youtube.com/vi/YOUR_VIDEO_ID/maxresdefault.jpg)](https://www.youtube.com/watch?v=YOUR_VIDEO_ID)
