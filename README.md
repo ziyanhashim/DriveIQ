@@ -16,7 +16,7 @@ Two user roles drive the platform: **students** (learner drivers) book sessions 
 
 ## Demo Video
 
-[![Demonstration Video](https://img.youtube.com/vi/In0Gj2574O8/maxresdefault.jpg)](https://www.youtube.com/watch?v=In0Gj2574O8)
+[![Demonstration Video](https://img.youtube.com/vi/-4Z9Mvttu1o/maxresdefault.jpg)](https://www.youtube.com/watch?v=-4Z9Mvttu1o)
 
 ## Architecture
 
