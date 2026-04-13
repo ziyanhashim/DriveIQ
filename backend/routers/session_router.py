@@ -98,7 +98,7 @@ def upload_and_process(
     if missing:
         raise HTTPException(status_code=400, detail=f"Missing required keys: {missing}")
 
-    road_type = sensor_json["road_type"]
+    road_type = sensor_json["road_type"].strip().title()
     session_id = _generate_session_id()
 
     # Overwrite session_id in the JSON so the pipeline uses our generated one

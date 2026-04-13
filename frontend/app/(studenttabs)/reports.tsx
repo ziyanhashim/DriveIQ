@@ -86,15 +86,22 @@ export default function ReportsListScreen() {
   }, [sessions]);
 
   // ── Filter + sort options ──────────────────────────────────────────────
+  const normalizeRoadType = (rt: string) => {
+    const low = rt.trim().toLowerCase();
+    if (low.startsWith("motor")) return "Motorway";
+    if (low.startsWith("second")) return "Secondary";
+    return rt.trim();
+  };
+
   const roadTypes = useMemo(() => {
-    const types = new Set(sessions.map((s) => s.road_type).filter(Boolean));
+    const types = new Set(sessions.map((s) => s.road_type).filter(Boolean).map(normalizeRoadType));
     return ["All", ...Array.from(types)];
   }, [sessions]);
 
   const filtered = useMemo(() => {
     let list = sessions;
     if (roadFilter !== "All") {
-      list = list.filter((s) => s.road_type === roadFilter);
+      list = list.filter((s) => normalizeRoadType(s.road_type) === roadFilter);
     }
     if (sortBy === "score") {
       list = [...list].sort((a, b) => b.performance_score - a.performance_score);
