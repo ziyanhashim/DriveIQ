@@ -11,6 +11,6 @@ passlib[bcrypt]
 joblib
 python-multipart
 scikit-learn
-tensorflow
+tensorflow-cpu
 openai
 dspydantic
