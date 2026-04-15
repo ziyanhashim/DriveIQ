@@ -34,7 +34,6 @@ frontend/.expo/web/
 CLAUDE.md
 
 # Dev scripts
-start-dev.sh
 
 # Demo/presentation utilities
 backend/scripts/seed_demo_data.py
@@ -55,13 +54,10 @@ Thumbs.db
 .ipynb_checkpoints/
 */.ipynb_checkpoints/
 
-# ML Model Artifacts (large files)
-*.pkl
+# ML Model Artifacts — large training outputs only
 *.h5
-*.keras
 *.joblib
 *.model
-ml-model/models/
 
 # ML Prediction Outputs & Data
 ml-model/notebooks/data/
